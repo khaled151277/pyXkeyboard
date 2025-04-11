@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python XKeyboard - User Guide</title>
+    <style>
+        /* --- Default Light Theme Variables --- */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --heading-color: #111111;
+            --link-color: #0066cc;
+            --border-color: #eeeeee;
+            --border-color-strong: #cccccc;
+            --code-bg: #f4f4f4;
+            --code-text: #333333;
+            --code-border: #dddddd;
+            --note-border: #cccccc;
+            --subtle-text: #555555;
+        }
+
+        /* --- Dark Theme Overrides --- */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #2b2b2b;
+                --text-color: #cccccc;
+                --heading-color: #eeeeee;
+                --link-color: #80bfff;
+                --border-color: #444444;
+                --border-color-strong: #666666;
+                --code-bg: #3c3c3c;
+                --code-text: #cccccc;
+                --code-border: #555555;
+                --note-border: #555555;
+                --subtle-text: #aaaaaa;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        h1, h2, h3 {
+            color: var(--heading-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+            margin-top: 25px;
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 2px solid var(--border-color-strong);
+            margin-top: 0;
+        }
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 2px 5px;
+            border: 1px solid var(--code-border);
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.95em;
+        }
+        strong {
+            font-weight: bold;
+            color: var(--heading-color);
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .note {
+            border: 1px solid var(--note-border);
+            padding: 15px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .note h2 {
+            margin-top: 0;
+            border-bottom: 1px dashed var(--note-border);
+        }
+        p {
+             margin-bottom: 15px;
+        }
+        /* Section for About info */
+        .about-section {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Python XKeyboard - User Guide</h1>
+
+    <p>Welcome to Python XKeyboard! This is a simple on-screen virtual keyboard that helps you type and switch between keyboard layouts (like English and Arabic) easily, with several customization options.</p>
+
+    <h2>Key Features:</h2>
+    <ul>
+        <li><strong>On-Screen Typing:</strong> Click keys on the virtual keyboard to type into other applications (requires XTEST, usually works on X11/Xorg).</li>
+        <li><strong>System Language Switching:</strong> Quickly switch your system's keyboard layout via the <code>Lang</code> button or tray menu (uses <code>setxkbmap</code>).</li>
+        <li><strong>Visual Layout Display:</strong> The virtual keyboard automatically updates to show characters for the current system layout.</li>
+        <li><strong>Modifier Keys:</strong> Use <code>Shift</code>, <code>Ctrl</code>, <code>Alt</code> on the virtual keyboard. Click once to lock for the next key press, then released automatically.</li>
+        <li><strong>Right-Click Shift:</strong> Right-click on a character key to simulate Shift + that key.</li>
+        <li><strong>Always on Top:</strong> Stays visible over other windows.</li>
+        <li><strong>System Tray Integration:</strong> Minimize to tray, select layout, show/quit from tray menu.</li>
+        <li><strong>Movable:</strong> Click and drag the keyboard's background area to move it.</li>
+        <li><strong>Customizable Appearance:</strong>
+            <ul>
+                <li>Adjust font family and size.</li>
+                <li>Change button text color.</li>
+                <li>Set window background opacity (buttons remain opaque).</li>
+                <li>Choose button style (Default, Flat, Gradient).</li>
+            </ul>
+        </li>
+        <li><strong>Configurable Behavior:</strong>
+            <ul>
+                <li>Remember window position and size.</li>
+                <li>Optionally minimize the window by middle-clicking its background.</li>
+                <li><strong>Auto-show when editing text:</strong> Automatically shows the keyboard when focus enters an editable text field (requires AT-SPI accessibility services).</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>How to Use:</h2>
+    <ol>
+        <li>
+            <strong>Starting the Keyboard:</strong> Run the script (e.g., <code>python3 main.py</code>).
+        </li>
+        <li>
+            <strong>Typing:</strong> Open your target application (e.g., text editor), then click keys on the virtual keyboard. Characters should appear if XTEST works.
+        </li>
+        <li>
+            <strong>Using Shift, Ctrl, Alt:</strong>
+            <ul>
+                <li>Click <code>Shift</code> once. It highlights. Click the next character (e.g., <code>a</code> -> <code>A</code>). <code>Shift</code> then releases automatically.</li>
+                <li>Same applies to <code>Ctrl</code> and <code>Alt</code>. Click modifier, then click the other key (e.g., <code>L Ctrl</code>, then <code>C</code> simulates Ctrl+C).</li>
+                <li>Right-clicking a character key (e.g., right-click <code>a</code>) simulates Shift+A directly.</li>
+            </ul>
+        </li>
+         <li>
+            <strong>Using Caps Lock:</strong> Click the <code>⇪ Caps</code> key. It toggles both the system's Caps Lock state (if XTEST works) and the visual appearance of letter keys on the virtual keyboard.
+        </li>
+        <li>
+            <strong>Switching Languages (Layouts):</strong>
+            <ul>
+                <li><strong>Using the <code>Lang</code> button:</strong> Click the button labeled <code>AR</code> or <code>EN</code>. It cycles the system layout (if possible) and updates the virtual keyboard display.</li>
+                <li><strong>Using the System Tray:</strong> Right-click the 'O' tray icon, go to "Select Layout", and click the desired layout name (e.g., <code>us</code> or <code>ara</code>).</li>
+            </ul>
+        </li>
+        <li>
+            <strong>Minimizing:</strong>
+            <ul>
+                <li>Click the standard close button (<code>X</code>) on the window. It hides to the system tray.</li>
+                 <li>If enabled in Settings, <strong>middle-click</strong> (mouse wheel click) anywhere on the keyboard's background area (not a button) to hide it to the tray.</li>
+            </ul>
+        </li>
+        <li>
+            <strong>Showing from Tray:</strong>
+            <ul>
+                 <li><strong>Left-click</strong> the 'O' icon in the system tray.</li>
+                 <li>Alternatively, <strong>right-click</strong> the 'O' icon and select "<strong>Show Keyboard</strong>".</li>
+            </ul>
+        </li>
+        <li>
+             <strong>Moving the Keyboard:</strong> Click anywhere on the virtual keyboard's main background area (not on a button) and drag it.
+        </li>
+         <li>
+            <strong>Settings:</strong> Click the <strong><code>Set</code></strong> button to open the Settings & Help window. Configure options like:
+            <ul>
+                <li>Remembering window position.</li>
+                <li>Enabling middle-click hide.</li>
+                <li><strong>Enable/Disable Auto-Show:</strong> Check/uncheck "Auto-show keyboard..." in the "General" tab. (Requires AT-SPI).</li>
+                 <li>Font family and size.</li>
+                 <li>Text color.</li>
+                 <li>Background opacity.</li>
+                 <li>Button style (Default, Flat, Gradient).</li>
+                 <li>View help guides (this one in "Help", Arabic in "Arabic Help").</li>
+            </ul>
+        </li>
+        <li>
+            <strong>Quitting the Application:</strong> <strong>Right-click</strong> the 'O' icon in the system tray and select "<strong>Quit</strong>".
+        </li>
+    </ol>
+
+    <div class="note">
+        <h2>Troubleshooting Notes:</h2>
+        <ul>
+            <li><strong>Typing doesn't work or types wrong characters:</strong>
+                <ul>
+                    <li>Usually means XTEST simulation is disabled or not working (e.g., Wayland session, missing `python-xlib`). Check the "About" window (click <code>About</code>) for XTEST status.</li>
+                    <li>**Important:** If wrong characters are typed (e.g., pressing `ذ` types `ع` in Arabic), it often means the system's active layout (`setxkbmap`) doesn't match what the virtual keyboard expects for that key *code*. Ensure your system layout settings are correct and match one of the layouts the virtual keyboard visually supports (like standard `us` or `ara`).</li>
+                 </ul>
+            </li>
+            <li><strong>Language switching doesn't work:</strong>
+                <ul>
+                    <li>Might mean <code>XKB_Switcher.py</code> is missing, <code>setxkbmap</code> command failed, or permissions issues. "About" window shows XKB status.</li>
+                    <li>You might still see the layout change visually on the virtual keyboard, but the system setting won't change.</li>
+                 </ul>
+            </li>
+            <li><strong>Only one language available:</strong> If you can't switch, you likely only have one layout configured in your OS settings (e.g., only 'us'). Add more via system settings.</li>
+            <li><strong>Tray icon missing:</strong> Some Linux desktops might lack system tray support or require configuration.</li>
+            <li><strong>Middle-click hide doesn't work:</strong> Ensure the option "Minimize window on middle mouse click" is checked in the Settings window (General tab).</li>
+            <li><strong>Auto-Show doesn't work:</strong>
+                <ul>
+                    <li>Ensure the option "Auto-show keyboard..." is checked in Settings (General tab).</li>
+                    <li>Verify that AT-SPI accessibility services are running on your system (check your desktop environment's accessibility settings). You might need to install packages like `at-spi2-core`, `python3-gi`, `gir1.2-atspi-2.0`.</li>
+                    <li>Check the "About" window for the AT-SPI status (N/A, Active, Inactive). "N/A" or errors during startup usually indicate missing dependencies (`focus_monitor.py` or its requirements).</li>
+                    <li>This feature might be less reliable on Wayland sessions compared to X11/Xorg.</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- NEW: About Section -->
+    <div class="about-section">
+        <h2>About Python XKeyboard</h2>
+        <p>Developed by: Khaled Abdelhamid<br>
+        Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
+
+        <p><strong>License:</strong><br>
+        This program is distributed under the terms of the GNU General Public License version 3 (GPLv3).</p>
+
+        <p><strong>Disclaimer:</strong><br>
+        This software is provided 'as is' without warranty of any kind, express or implied. Use at your own risk.</p>
+
+        <p>If you find this program useful, please consider supporting its development via PayPal:<br>
+        <a href="https://paypal.me/kh1512">https://paypal.me/kh1512</a><br>
+        (Link for copying: <code>paypal.me/kh1512</code>)</p>
+
+        <p>Thank you!</p>
+    </div>
+    <!-- End NEW Section -->
+
+
+    <p style="text-align:center; margin-top: 30px; font-size: 0.9em; color: var(--subtle-text);">
+        Enjoy using Python XKeyboard!
+    </p>
+
+</body>
+</html>

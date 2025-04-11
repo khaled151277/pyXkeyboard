@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python XKeyboard - دليل المستخدم</title>
+    <style>
+        /* --- متغيرات المظهر الفاتح الافتراضي --- */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --heading-color: #111111;
+            --link-color: #0066cc;
+            --border-color: #eeeeee;
+            --border-color-strong: #cccccc;
+            --code-bg: #f4f4f4;
+            --code-text: #333333;
+            --code-border: #dddddd;
+            --note-border: #cccccc;
+            --subtle-text: #555555;
+        }
+
+        /* --- تجاوزات المظهر الداكن --- */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #2b2b2b;
+                --text-color: #cccccc;
+                --heading-color: #eeeeee;
+                --link-color: #80bfff;
+                --border-color: #444444;
+                --border-color-strong: #666666;
+                --code-bg: #3c3c3c;
+                --code-text: #cccccc;
+                --code-border: #555555;
+                --note-border: #555555;
+                --subtle-text: #aaaaaa;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        h1, h2, h3 {
+            color: var(--heading-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+            margin-top: 25px;
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 2px solid var(--border-color-strong);
+            margin-top: 0;
+        }
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 2px 5px;
+            border: 1px solid var(--code-border);
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.95em;
+            direction: ltr; /* Ensure code blocks remain LTR */
+            display: inline-block; /* Prevent breaking */
+        }
+        strong {
+            font-weight: bold;
+            color: var(--heading-color);
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-right: 25px; /* Padding for RTL */
+            padding-left: 0;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .note {
+            border: 1px solid var(--note-border);
+            padding: 15px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .note h2 {
+            margin-top: 0;
+            border-bottom: 1px dashed var(--note-border);
+        }
+        p {
+             margin-bottom: 15px;
+        }
+        /* Section for About info */
+        .about-section {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Python XKeyboard - دليل المستخدم</h1>
+
+    <p>مرحبًا بك في Python XKeyboard! هذه لوحة مفاتيح افتراضية بسيطة تظهر على الشاشة لمساعدتك في الكتابة والتبديل بين تخطيطات لوحة المفاتيح (مثل الإنجليزية والعربية) بسهولة، مع العديد من خيارات التخصيص.</p>
+
+    <h2>الميزات الرئيسية:</h2>
+    <ul>
+        <li><strong>الكتابة على الشاشة:</strong> انقر على المفاتيح في لوحة المفاتيح الافتراضية للكتابة في تطبيقات أخرى (يتطلب ميزة XTEST، تعمل عادةً على أنظمة X11/Xorg).</li>
+        <li><strong>تبديل لغة النظام:</strong> قم بتبديل تخطيط لوحة مفاتيح النظام بسرعة عبر زر <code>Lang</code> أو قائمة علبة النظام (يستخدم أمر <code>setxkbmap</code>).</li>
+        <li><strong>عرض التخطيط المرئي:</strong> يتم تحديث لوحة المفاتيح الافتراضية تلقائيًا لإظهار الأحرف الخاصة بالتخطيط النشط في النظام.</li>
+        <li><strong>مفاتيح التعديل:</strong> استخدم مفاتيح <code>Shift</code> (شيفت), <code>Ctrl</code> (كنترول), <code>Alt</code> (آلت) في لوحة المفاتيح الافتراضية. انقر مرة واحدة "لتثبيتها" لضغطة المفتاح *التالية*، ثم يتم تحريرها تلقائيًا.</li>
+        <li><strong>شيفت بالنقر الأيمن:</strong> انقر بزر الماوس الأيمن على مفتاح حرف لمحاكاة الضغط على Shift + ذلك المفتاح.</li>
+        <li><strong>البقاء في المقدمة دائمًا:</strong> تبقى مرئية فوق النوافذ الأخرى.</li>
+        <li><strong>التكامل مع شريط النظام:</strong> تصغير إلى شريط النظام، تحديد التخطيط، إظهار/إنهاء التطبيق من قائمة الشريط.</li>
+        <li><strong>قابلة للتحريك:</strong> انقر واسحب منطقة خلفية لوحة المفاتيح لتحريكها.</li>
+        <li><strong>مظهر قابل للتخصيص:</strong>
+            <ul>
+                <li>ضبط عائلة الخط وحجمه.</li>
+                <li>تغيير لون نص الأزرار.</li>
+                <li>ضبط شفافية خلفية النافذة (تبقى الأزرار غير شفافة).</li>
+                <li>اختيار نمط الأزرار (افتراضي، مسطح، متدرج).</li>
+            </ul>
+        </li>
+        <li><strong>سلوك قابل للتهيئة:</strong>
+            <ul>
+                <li>تذكر موضع النافذة وحجمها.</li>
+                <li>اختياريًا، تصغير النافذة بالنقر الأوسط على خلفيتها.</li>
+                <li><strong>الظهور التلقائي عند تحرير نص:</strong> إظهار لوحة المفاتيح تلقائيًا عند انتقال التركيز إلى حقل نصي قابل للتحرير (يتطلب خدمات إمكانية الوصول AT-SPI).</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>كيفية الاستخدام:</h2>
+    <ol>
+        <li>
+            <strong>بدء تشغيل لوحة المفاتيح:</strong> قم بتشغيل الاسكربت (مثل <code>python3 main.py</code>).
+        </li>
+        <li>
+            <strong>الكتابة:</strong> افتح التطبيق الهدف (مثل محرر النصوص)، ثم انقر على المفاتيح في لوحة المفاتيح الافتراضية. يجب أن تظهر الأحرف إذا كانت ميزة XTEST تعمل.
+        </li>
+        <li>
+            <strong>استخدام شيفت، كنترول، آلت:</strong>
+            <ul>
+                <li>انقر على <code>Shift</code> مرة واحدة. سيتم تمييزه. انقر على الحرف التالي (مثل <code>a</code> -> <code>A</code>). سيتم تحرير <code>Shift</code> تلقائيًا بعد ذلك.</li>
+                <li>ينطبق الشيء نفسه على <code>Ctrl</code> و <code>Alt</code>. انقر على مفتاح التعديل، ثم انقر على المفتاح الآخر (مثل <code>L Ctrl</code>، ثم <code>C</code> يحاكي Ctrl+C).</li>
+                <li>النقر بزر الماوس الأيمن على مفتاح حرف (مثل النقر الأيمن على <code>a</code>) يحاكي Shift+A مباشرةً.</li>
+            </ul>
+        </li>
+         <li>
+            <strong>استخدام قفل الإدخال بالأحرف الكبيرة (Caps Lock):</strong> انقر على مفتاح <code>⇪ Caps</code>. يؤدي هذا إلى تبديل حالة Caps Lock في النظام (إذا كانت XTEST تعمل) والمظهر المرئي لمفاتيح الأحرف في لوحة المفاتيح الافتراضية.
+        </li>
+        <li>
+            <strong>تبديل اللغات (التخطيطات):</strong>
+            <ul>
+                <li><strong>باستخدام زر <code>Lang</code>:</strong> انقر على الزر المسمى <code>AR</code> أو <code>EN</code>. يقوم بتبديل تخطيط النظام (إذا أمكن) وتحديث عرض لوحة المفاتيح الافتراضية.</li>
+                <li><strong>باستخدام شريط النظام:</strong> انقر بزر الماوس الأيمن على أيقونة 'O' في شريط النظام، انتقل إلى "Select Layout" (تحديد التخطيط)، وانقر على اسم التخطيط المطلوب (مثل <code>us</code> أو <code>ara</code>).</li>
+            </ul>
+        </li>
+        <li>
+            <strong>التصغير:</strong>
+            <ul>
+                <li>انقر على زر الإغلاق القياسي (<code>X</code>) في النافذة. سيتم إخفاؤها في شريط النظام.</li>
+                 <li>إذا تم تمكينه في الإعدادات، انقر <strong>بالنقر الأوسط</strong> (نقر عجلة الماوس) في أي مكان على منطقة خلفية لوحة المفاتيح (وليس على زر) لإخفائها في شريط النظام.</li>
+            </ul>
+        </li>
+        <li>
+            <strong>الإظهار من شريط النظام:</strong>
+            <ul>
+                 <li>انقر <strong>بالنقر الأيسر</strong> على أيقونة 'O' في شريط النظام.</li>
+                 <li>بدلاً من ذلك، انقر <strong>بالنقر الأيمن</strong> على أيقونة 'O' واختر "<strong>Show Keyboard</strong>" (إظهار لوحة المفاتيح).</li>
+            </ul>
+        </li>
+        <li>
+             <strong>تحريك لوحة المفاتيح:</strong> انقر في أي مكان على منطقة الخلفية الرئيسية للوحة المفاتيح الافتراضية (وليس على زر) واسحبها.
+        </li>
+         <li>
+            <strong>الإعدادات:</strong> انقر على زر <strong><code>Set</code></strong> لفتح نافذة الإعدادات والمساعدة. قم بتهيئة الخيارات مثل:
+            <ul>
+                <li>تذكر موضع النافذة.</li>
+                <li>تمكين الإخفاء بالنقر الأوسط.</li>
+                <li><strong>تمكين/تعطيل الظهور التلقائي:</strong> حدد/ألغِ تحديد "Auto-show keyboard..." في تبويب "General" (عام). (يتطلب AT-SPI).</li>
+                 <li>عائلة الخط وحجمه.</li>
+                 <li>لون النص.</li>
+                 <li>شفافية الخلفية.</li>
+                 <li>نمط الأزرار (افتراضي، مسطح، متدرج).</li>
+                 <li>عرض أدلة المساعدة (الإنجليزي في "Help"، والعربي في "مساعدة عربية").</li>
+            </ul>
+        </li>
+        <li>
+            <strong>إنهاء التطبيق:</strong> انقر <strong>بالنقر الأيمن</strong> على أيقونة 'O' في شريط النظام واختر "<strong>Quit</strong>" (إنهاء).
+        </li>
+    </ol>
+
+    <div class="note">
+        <h2>ملاحظات استكشاف الأخطاء وإصلاحها:</h2>
+        <ul>
+            <li><strong>الكتابة لا تعمل أو تُظهر حروفًا خاطئة:</strong>
+                <ul>
+                    <li>يعني هذا عادةً أن محاكاة XTEST معطلة أو لا تعمل بشكل صحيح (مثل جلسة Wayland، أو فقدان مكتبة <code>python-xlib</code>). تحقق من نافذة "About" (حول) (انقر على <code>About</code>) لمعرفة حالة XTEST.</li>
+                    <li>**هام:** إذا تمت كتابة أحرف خاطئة (على سبيل المثال، الضغط على <code>ذ</code> يكتب <code>ع</code>)، فهذا يعني غالبًا أن التخطيط النشط في نظام التشغيل (عبر <code>setxkbmap</code>) لا يتطابق تمامًا مع ما تتوقعه لوحة المفاتيح الافتراضية لـ *رمز* المفتاح هذا. تأكد من أن إعدادات تخطيط النظام صحيحة وتطابق أحد التخطيطات التي تدعمها لوحة المفاتيح الافتراضية بصريًا (مثل <code>us</code> أو <code>ara</code> القياسية).</li>
+                 </ul>
+            </li>
+            <li><strong>تبديل اللغة لا يعمل:</strong>
+                <ul>
+                    <li>قد يعني هذا أن ملف <code>XKB_Switcher.py</code> مفقود، أو أن أمر <code>setxkbmap</code> فشل، أو وجود مشكلات في الأذونات. تظهر نافذة "About" (حول) حالة XKB.</li>
+                    <li>قد لا تزال ترى التخطيط يتغير بصريًا على لوحة المفاتيح الافتراضية، لكن إعداد النظام لن يتغير.</li>
+                 </ul>
+            </li>
+            <li><strong>لغة واحدة فقط متاحة:</strong> إذا لم تتمكن من التبديل، فمن المحتمل أن لديك تخطيطًا واحدًا فقط مهيأ في إعدادات نظام التشغيل (مثل 'us' فقط). أضف المزيد عبر إعدادات النظام.</li>
+            <li><strong>أيقونة شريط النظام مفقودة:</strong> قد تفتقر بعض أسطح مكتب لينكس إلى دعم شريط النظام أو تتطلب تهيئة.</li>
+            <li><strong>الإخفاء بالنقر الأوسط لا يعمل:</strong> تأكد من تحديد خيار "Minimize window on middle mouse click" (تصغير النافذة بالنقر الأوسط) في نافذة الإعدادات (علامة التبويب "General" - عام).</li>
+            <li><strong>الظهور التلقائي لا يعمل:</strong>
+                <ul>
+                    <li>تأكد من تحديد خيار "Auto-show keyboard..." في الإعدادات (تبويب "General").</li>
+                    <li>تحقق من أن خدمات إمكانية الوصول AT-SPI قيد التشغيل في نظامك (تحقق من إعدادات إمكانية الوصول في بيئة سطح المكتب لديك). قد تحتاج إلى تثبيت حزم مثل <code>at-spi2-core</code>، <code>python3-gi</code>، <code>gir1.2-atspi-2.0</code>.</li>
+                    <li>تحقق من نافذة "About" (حول) لمعرفة حالة AT-SPI (غير متاح N/A، نشط Active، غير نشط Inactive). تشير حالة "N/A" أو وجود أخطاء أثناء بدء التشغيل عادةً إلى فقدان المتطلبات (ملف <code>focus_monitor.py</code> أو متطلباته).</li>
+                    <li>قد تكون هذه الميزة أقل موثوقية في جلسات Wayland مقارنة بـ X11/Xorg.</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- NEW: About Section -->
+    <div class="about-section">
+        <h2>حول Python XKeyboard</h2>
+        <p>تم التطوير بواسطة: خالد عبد الحميد<br>
+        للتواصل: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
+
+        <p><strong>الترخيص:</strong><br>
+        يتم توزيع هذا البرنامج بموجب شروط رخصة جنو العمومية الإصدار 3 (GPLv3).</p>
+
+        <p><strong>إخلاء مسؤولية:</strong><br>
+        يتم توفير هذا البرنامج "كما هو" دون أي ضمان من أي نوع، صريحًا كان أم ضمنيًا. استخدمه على مسؤوليتك الخاصة.</p>
+
+        <p>إذا وجدت هذا البرنامج مفيدًا، يرجى التفكير في دعم تطويره عبر باي بال:<br>
+        <a href="https://paypal.me/kh1512">https://paypal.me/kh1512</a><br>
+        (رابط للنسخ: <code dir="ltr">paypal.me/kh1512</code>)</p>
+
+        <p>شكرًا لك!</p>
+    </div>
+    <!-- End NEW Section -->
+
+    <p style="text-align:center; margin-top: 30px; font-size: 0.9em; color: var(--subtle-text);">
+        استمتع باستخدام Python XKeyboard!
+    </p>
+
+</body>
+</html>
