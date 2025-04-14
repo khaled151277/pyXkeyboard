@@ -70,7 +70,7 @@ class VirtualKeyboard(QMainWindow):
         self.settings = load_settings() # Load settings first
 
         # --- تحميل الإعدادات المتعلقة بالنافذة ---
-        self.is_frameless = self.settings.get("frameless_window", DEFAULT_SETTINGS.get("frameless_window", False)) # Use .get() for default too
+        self.is_frameless = self.settings.get("frameless_window", DEFAULT_SETTINGS.get("frameless_window", False))
         self.always_on_top = self.settings.get("always_on_top", DEFAULT_SETTINGS.get("always_on_top", True))
         self.is_sticky = self.settings.get("sticky_on_all_workspaces", DEFAULT_SETTINGS.get("sticky_on_all_workspaces", False)) # تحميل حالة الالتصاق
         # --- نهاية تحميل الإعدادات ---
@@ -202,8 +202,11 @@ class VirtualKeyboard(QMainWindow):
         try:
             self.app_font.setFamily(font_family); self.app_font.setPointSize(font_size); print(f"Loaded font: {self.app_font.family()} {self.app_font.pointSize()}pt")
             # Do not save back here, let save_settings handle consistency
+            # self.settings["font_family"] = self.app_font.family(); self.settings["font_size"] = self.app_font.pointSize()
         except Exception as e:
             print(f"ERROR creating font: {e}. Using default."); self.app_font.setFamily(DEFAULT_SETTINGS.get("font_family", "Sans Serif")); self.app_font.setPointSize(DEFAULT_SETTINGS.get("font_size", 9))
+            # Do not save back here
+            # self.settings["font_family"] = self.app_font.family(); self.settings["font_size"] = self.app_font.pointSize()
 
     def apply_initial_geometry(self):
         initial_geom_applied = False; min_width, min_height = 400, 130
@@ -514,6 +517,7 @@ class VirtualKeyboard(QMainWindow):
                 try:
                     badge_uri = Path(badge_icon_path_full).as_uri()
                     badge_html = f'<img src="{badge_uri}" alt="App Icon" width="64" height="64" style="float: left; margin-right: 10px; margin-bottom: 10px;">'
+                    # print(f"Using badge URI: {badge_uri}") # Less verbose
                 except Exception as uri_e:
                      print(f"Error creating file URI for badge: {uri_e}")
                      badge_html = f'<img src="{badge_icon_path_relative}" alt="Icon" width="64" height="64" style="float: left; margin-right: 10px; margin-bottom: 10px;">'
@@ -523,7 +527,7 @@ class VirtualKeyboard(QMainWindow):
             main_info = f"""
              {badge_html}
              <div style="overflow: hidden;">
-             <p><b>{program_name} v1.0.2</b><br>A simple on-screen virtual keyboard.</p>
+             <p><b>{program_name} v1.0.1</b><br>A simple on-screen virtual keyboard.</p>
              <p>Developed by: Khaled Abdelhamid<br>Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
              <p><b>License:</b><br>GNU General Public License v3 (GPLv3)</p>
              <p><b>Disclaimer:</b><br>Provided 'as is'. Use at your own risk.</p>
@@ -581,7 +585,7 @@ class VirtualKeyboard(QMainWindow):
             try: dialog.settingsApplied.disconnect(self._apply_settings_from_dialog)
             except (TypeError, RuntimeError): pass # Ignore if already disconnected or failed
 
-    # --- *** تصحيح الدالة لتمرير البيانات بشكل صحيح *** ---
+    # --- تمت الإضافة: دالة لتغيير حالة الالتصاق ---
     def _set_sticky_state(self, sticky: bool):
         """Sets the window's sticky state using Xlib EWMH hints."""
         if self.is_xlib_dummy or not Xlib:
@@ -595,13 +599,9 @@ class VirtualKeyboard(QMainWindow):
         try:
             win_id = self.winId()
             if not win_id:
-                 # قد لا يكون معرف النافذة متاحًا على الفور، حاول مرة أخرى بعد قليل
-                 QTimer.singleShot(200, lambda: self._set_sticky_state(sticky))
-                 print("Sticky state: winId not ready, retrying shortly...")
+                 print("Sticky state: Failed (Invalid winId)")
                  return
 
-            # --- Atoms ---
-            # _NET_WM_STATE_REMOVE=0, _NET_WM_STATE_ADD=1, _NET_WM_STATE_TOGGLE=2
             NET_WM_STATE = display.intern_atom('_NET_WM_STATE')
             NET_WM_STATE_STICKY = display.intern_atom('_NET_WM_STATE_STICKY')
 
@@ -609,29 +609,22 @@ class VirtualKeyboard(QMainWindow):
                 print("Sticky state: Failed (Could not get EWMH atoms. WM incompatible?)")
                 return
 
-            # --- بناء البيانات بشكل صحيح ---
             action = 1 if sticky else 0  # 1 = add state, 0 = remove state
-            # البيانات: [action, atom_to_change, 0, source_indication, 0]
-            # source_indication = 1 for normal applications
-            # يجب أن تكون قائمة أو tuple من الأعداد الصحيحة
-            data = [action, NET_WM_STATE_STICKY, 0, 1, 0] # تمرير كقائمة
+            # Format: action, atom1, atom2, source indication (1=app), 0
+            data = (action, NET_WM_STATE_STICKY, 0, 1, 0)
 
             root = display.screen().root
-            # إنشاء ClientMessage بشكل أكثر تحديدًا
-            # التأكد من أن window هو win_id الصحيح
             event = Xlib.protocol.event.ClientMessage(
-                window=win_id,           # استخدام win_id هنا
+                window=win_id,
                 client_type=NET_WM_STATE,
-                data=(32, data)          # تحديد تنسيق 32 بت وتمرير البيانات
+                data=(32, data) # 32-bit format
             )
-            # --- نهاية بناء البيانات ---
 
-            # Send event to the root window, notifying the window manager
-            # EWMH specifies SubstructureRedirectMask | SubstructureNotifyMask
+            # Send event to the root window
             mask = (X.SubstructureRedirectMask | X.SubstructureNotifyMask)
             root.send_event(event, event_mask=mask)
-            display.flush() # Ensure the request is sent
-            print(f"Sticky state: {'Enabled' if sticky else 'Disabled'} (EWMH message sent for window {win_id})")
+            display.flush()
+            print(f"Sticky state: {'Enabled' if sticky else 'Disabled'} (EWMH message sent)")
 
         except Exception as e:
             print(f"Sticky state: ERROR applying - {e}", file=sys.stderr)
@@ -639,7 +632,7 @@ class VirtualKeyboard(QMainWindow):
             try:
                 if display: display.flush()
             except: pass
-    # --- نهاية الدالة المعدلة ---
+    # --- نهاية الإضافة ---
 
 
     def _apply_settings_from_dialog(self, applied_settings):
@@ -703,23 +696,20 @@ class VirtualKeyboard(QMainWindow):
             if current_visibility:
                 print("  Re-showing window...")
                 # Use a small delay before showing to allow WM to process flags
-                # And apply sticky state *after* showing again
-                QTimer.singleShot(50, lambda: (self.show(), self._set_sticky_state(self.is_sticky)))
+                QTimer.singleShot(50, self.show)
             else:
                  print("  Window was hidden, keeping hidden.")
-                 # Apply sticky state even if hidden
-                 self._set_sticky_state(self.is_sticky)
-
         else:
             # If flags didn't change, just reapply styles and update labels
             self._apply_global_styles_and_font()
             self.update_key_labels()
             print("Styles and labels updated (no flag change).")
-            # Apply sticky state if it changed, even if flags didn't
-            if self.is_sticky != previous_sticky:
-                 print(f"Sticky state changed to: {self.is_sticky}. Applying...")
-                 self._set_sticky_state(self.is_sticky)
 
+        # --- تطبيق حالة الالتصاق إذا تغيرت ---
+        if self.is_sticky != previous_sticky:
+             print(f"Sticky state changed to: {self.is_sticky}. Applying...")
+             self._set_sticky_state(self.is_sticky)
+        # --- نهاية تطبيق الالتصاق ---
 
         # Refresh tray icon (tooltip might change)
         self.init_tray_icon()

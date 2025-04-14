@@ -1,0 +1,23 @@
+Source: pyxkeyboard
+Section: Accessories
+Priority: optional
+Maintainer: Khaled Abdelhamid <khaled1512@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3-all, python3-setuptools
+Standards-Version: 4.6.0
+Homepage: https://github.com/khaled151277/pyXkeyboard # --- TODO: Replace with actual URL ---
+
+Package: pyxkeyboard
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}, python3-pyqt6, python3-xlib, x11-xkb-utils, python3-gi, gir1.2-atspi-2.0
+Description: On-screen virtual keyboard with layout switching
+ A simple, customizable on-screen virtual keyboard for Linux (X11/Xorg).
+ Features include:
+  * Typing via XTEST simulation.
+  * System keyboard layout switching (via setxkbmap).
+  * Visual feedback for the current layout (EN/AR).
+  * Modifier key support (Shift, Ctrl, Alt, Caps Lock).
+  * Resizable.
+  * Easy Movable.
+  * System tray integration.
+  * Customizable appearance (font, opacity, colors).
+  * Optional auto-show when focusing text fields (via AT-SPI).

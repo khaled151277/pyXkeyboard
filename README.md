@@ -1,4 +1,4 @@
-# pyXkeyboard v1.01
+# pyxkeyboard v1.01
 
 A simple, customizable on-screen virtual keyboard for Linux systems (primarily X11/Xorg), featuring layout switching, key simulation via XTEST, and optional auto-show functionality using AT-SPI.
 

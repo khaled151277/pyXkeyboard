@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0.1
+Name=Python XKeyboard
+GenericName=Virtual Keyboard
+Comment=On-screen virtual keyboard with layout switching (X11)
+Exec=pyxkeyboard
+Icon=pyxkeyboard
+Terminal=false
+Type=Application
+Categories=Accessories;Accessibility;
+Keywords=keyboard;virtual;onscreen;qt;x11;xtest;setxkbmap;arabic;english;linux;accessibility;
