@@ -1,0 +1,30 @@
+1.0.3
+
+ملخص التغييرات:
+init_ui:
+تم تعريف مجموعات من أسماء المفاتيح (repeatable_keys, non_repeatable_functional_keys, modifier_keys, special_action_keys) لتسهيل تحديد سلوك كل زر.
+تم توسيع repeatable_keys لتشمل 'Up', 'Down', 'Left', 'Right'.
+في حلقة إنشاء الأزرار، يتم الآن التحقق مما إذا كان key_name موجودًا في repeatable_keys. إذا كان الأمر كذلك، يتم ربط pressed و released بالدوال _handle_key_pressed و _handle_key_released.
+يتم الآن ربط on_non_repeatable_key_press فقط للمفاتيح الموجودة في non_repeatable_functional_keys.
+تمت إضافة شرط لمنع النقر بزر الماوس الأيمن (محاكاة Shift) على مفاتيح الأسهم، حيث أنها ليست مفاتيح "قابلة للكتابة" بالمعنى التقليدي.
+_simulate_single_key_press: تمت إضافة تحقق خاص لمفاتيح الأسهم لضمان عدم تأثرها بحالة Caps Lock عند تحديد effective_shift. Shift العادي لا يزال يعمل معها إذا كان مضغوطًا.
+_handle_key_pressed: تم تعديل منطق تحرير المفاتيح المعدلة (should_release_mods) بحيث لا يتم تحريرها عند الضغط على مفتاح سهم، فقط عند الضغط على مفتاح قابل للكتابة.
+_trigger_initial_repeat و _trigger_subsequent_repeat: تم التأكد من عدم تحرير المفاتيح المعدلة أثناء تكرار الضغط (وهو السلوك المتوقع للتكرار). تمت إضافة تحقق لإيقاف التكرار إذا فشلت محاكاة الضغط.
+الآن، يجب أن تعمل مفاتيح الأسهم الأربعة (Up, Down, Left, Right) مع خاصية الضغط المطول والتكرار بنفس طريقة عمل مفاتيح الحروف والأرقام والرموز.
+------------------------
+
+**ملخص التغييرات:**
+
+1.  **`settings_manager.py`**:
+    *   تم تحديث `DEFAULT_SETTINGS` بالقيم المطلوبة.
+    *   تم تغيير `SETTINGS_DIR` إلى `~/.pyxkeyboard`.
+    *   تمت إضافة معالجة أفضل لقيمة `window_geometry` غير الصالحة في `load_settings` و `save_settings`.
+2.  **`settings_dialog.py`**:
+    *   تمت إعادة `setMinimumSize(500, 650)` بدلاً من `setFixedSize` للسماح بتغيير الحجم إذا لزم الأمر، ولكن مع الحفاظ على الحد الأدنى.
+    *   تمت إضافة `QLabel` بجوار `button_style_combo` لتوضيح أنه يُطبق فقط عند تعطيل ألوان النظام.
+    *   تم تعديل `on_use_system_colors_changed` ليشمل تمكين/تعطيل `button_style_label` أيضًا.
+3.  **`virtual_keyboard_gui.py`**:
+    *   تم تعديل `_apply_global_styles_and_font` لتطبيق لون النص تلقائيًا (أسود/أبيض) بناءً على سطوع خلفية زر السمة عند تمكين `use_system_colors`.
+    *   يتم تطبيق لون النص المخصص فقط عندما تكون `use_system_colors=False`.
+    *   لا يزال لون خلفية النافذة وخلفية الأزرار المخصص يطبقان فقط عند `use_system_colors=False`.
+    *   تم تعديل تطبيق خلفية النافذة ليعمل بشكل صحيح مع الشفافية عند استخدام ألوان النظام.

@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# file:main.py
+# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# Features include X11 key simulation (XTEST), system layout switching (XKB),
+# visual layout updates, configurable appearance (fonts, colors, opacity, styles),
+# auto-repeat, system tray integration, and optional AT-SPI based auto-show.
+# Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Main entry point for the Python XKeyboard application.
 
 import sys
@@ -101,3 +107,4 @@ def main():
 # أو عند تشغيل السكربت التنفيذي `pyxkeyboard` الذي تم إنشاؤه بواسطة setup.py
 if __name__ == "__main__":
     main()
+# file:main.py

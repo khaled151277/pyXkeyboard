@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# File: xlib_integration.py
+# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# Features include X11 key simulation (XTEST), system layout switching (XKB),
+# visual layout updates, configurable appearance (fonts, colors, opacity, styles),
+# auto-repeat, system tray integration, and optional AT-SPI based auto-show.
+# Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Handles Xlib import, dummy creation, and provides XTEST functions
 
 import sys
@@ -205,3 +211,4 @@ def flush_display():
             _display.flush()
         except Exception as e:
             print(f"WARNING: Error flushing display: {e}", file=sys.stderr)
+# File: xlib_integration.py

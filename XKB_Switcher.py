@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 # File: XKB_Switcher.py
+# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# Features include X11 key simulation (XTEST), system layout switching (XKB),
+# visual layout updates, configurable appearance (fonts, colors, opacity, styles),
+# auto-repeat, system tray integration, and optional AT-SPI based auto-show.
+# Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Manages keyboard layouts using the 'setxkbmap' command-line tool.
 
 import subprocess
@@ -276,3 +281,4 @@ class XKBManager:
         print(f"Cycling layout: Index {current_index} -> {next_index}")
 
         return self.set_layout_by_index(next_index, update_system=True)
+# File: XKB_Switcher.py

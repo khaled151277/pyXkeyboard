@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# file:key_definition.py
+# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# Features include X11 key simulation (XTEST), system layout switching (XKB),
+# visual layout updates, configurable appearance (fonts, colors, opacity, styles),
+# auto-repeat, system tray integration, and optional AT-SPI based auto-show.
+# Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Defines keyboard layout, character mappings, and X11 keysym constants.
 
 from .xlib_integration import XK
@@ -87,4 +93,4 @@ KEYBOARD_LAYOUT = [
     # Row 6: Bottom row (User Modified previously, Donate added here)
     [('L Ctrl', 1, 2), ('L Win', 1, 1), ('L Alt', 1, 1), ('Space', 1, 7), ('R Alt', 1, 1), ('R Win', 1, 1), ('App', 1, 1), ('R Ctrl', 1, 2), ('Left', 1, 1), ('Down', 1, 1), ('Right', 1, 1), ('Donate', 1, 1)] # Replaced last None with Donate
 ]
-# --- نهاية التحديث ---
+# file:key_definition.py

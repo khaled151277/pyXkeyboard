@@ -3,6 +3,12 @@
 
 # File: focus_monitor.py
 # Monitors AT-SPI focus events to detect when focus enters an editable text field.
+# -*- coding: utf-8 -*-
+# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# Features include X11 key simulation (XTEST), system layout switching (XKB),
+# visual layout updates, configurable appearance (fonts, colors, opacity, styles),
+# auto-repeat, system tray integration, and optional AT-SPI based auto-show.
+# Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 
 import sys
 import gi
