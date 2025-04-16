@@ -6,6 +6,7 @@
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.
 # Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Contains the main VirtualKeyboard class, UI, event handling, and integration logic.
+# --- تم التعديل لإصلاح مشكلة زر ميتا (Win/Super) وزر القائمة (App) ---
 
 import sys
 import os
@@ -112,6 +113,9 @@ class VirtualKeyboard(QMainWindow):
         self.resize_margin = 4
         self.setMouseTracking(True)
         self.buttons = {}; self.current_language = 'en'; self.shift_pressed = False; self.ctrl_pressed = False; self.alt_pressed = False; self.caps_lock_pressed = False
+        # --- *** تم التراجع عن إضافة win_pressed *** ---
+        # self.win_pressed = False # Track Super key state
+        # --- *** نهاية التراجع *** ---
         self.drag_position = None; self.xkb_manager = None; self.tray_icon = None; self.icon = None; self.language_menu = None; self.language_actions = {}; self.lang_action_group = None
         self.focus_monitor = None; self.focus_monitor_available = _focus_monitor_available
         self.tray_menu = None
@@ -254,7 +258,6 @@ class VirtualKeyboard(QMainWindow):
     def show_normal_and_raise(self):
         if self.isHidden(): self.showNormal(); self.raise_()
 
-    # --- *** تعديل: تطبيق ألوان النظام أو الألوان المخصصة *** ---
     def _apply_global_styles_and_font(self):
         if not self.central_widget: return
         use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
@@ -266,29 +269,25 @@ class VirtualKeyboard(QMainWindow):
         button_bg_color_setting = self.settings.get("button_background_color", DEFAULT_SETTINGS.get("button_background_color", "#E1E1E1"))
 
         # --- تحديد لون النص الأساسي ---
-        final_text_color = custom_text_color # القيمة الافتراضية هي اللون المخصص
+        final_text_color = custom_text_color
         if use_system_colors:
-            # إذا استخدمنا ألوان النظام، نحدد لون النص تلقائيًا
-            palette = self.palette() # احصل على لوحة ألوان التطبيق الحالية
+            palette = self.palette()
             button_color = palette.color(QPalette.ColorRole.Button)
-            # حساب قيمة السطوع (بسيطة) للون خلفية الزر
-            # Y = 0.299*R + 0.587*G + 0.114*B (نطاق 0-255)
-            luminance = 0.299 * button_color.red() + 0.587 * button_color.green() + 0.114 * button_color.blue()
-            if luminance > 128: # إذا كانت الخلفية فاتحة
-                final_text_color = "#000000" # استخدم نص أسود
+            brightness = button_color.value()
+            if brightness > 128:
+                final_text_color = "#000000"
                 print("System theme detected as light, using black text.")
-            else: # إذا كانت الخلفية غامقة
-                final_text_color = "#FFFFFF" # استخدم نص أبيض
+            else:
+                final_text_color = "#FFFFFF"
                 print("System theme detected as dark, using white text.")
         else:
-             # إذا لم نستخدم ألوان النظام، نستخدم اللون المحدد في الإعدادات
              final_text_color = custom_text_color
              print(f"Using custom text color: {final_text_color}")
 
 
         # --- بناء أنماط الأزرار الأساسية ---
         common_button_style_parts = [
-            f"color: {final_text_color};", # استخدام لون النص المحسوب أو المخصص
+            f"color: {final_text_color};",
             f"font-family: '{font_family}';",
             f"font-size: {font_size}pt;",
             "padding: 2px;"
@@ -321,22 +320,21 @@ class VirtualKeyboard(QMainWindow):
 
         else:
             # --- استخدام ألوان وأنماط النظام ---
-            # لا نحدد background-color أو border أو border-radius، نتركها للسمة
-            button_specific_style_parts = [] # Reset specific styles
+            button_specific_style_parts = [] # No custom bg or borders
             base_button_style = " ".join(common_button_style_parts)
             print("Applying system theme styles for buttons.")
 
 
-        # --- Styles for special states/buttons (applied regardless of system colors setting) ---
-        toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;"
-        custom_control_style = "font-weight: bold; font-size: 10pt;" # For Minimize/Close
-
-        # --- نمط خاص لزر التبرع (يجب أن يتجاوز الأنماط الأساسية) ---
+        # --- Styles for special states/buttons ---
+        # --- *** تعديل: إزالة النمط الخاص بـ modifier_on لأنه لن يستخدم لمفاتيح Win/App *** ---
+        # toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;"
+        toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;" # Keep for Shift, Ctrl, Alt, Caps
+        custom_control_style = "font-weight: bold; font-size: 10pt;"
         donate_style = "font-size: 10pt; font-weight: bold; background-color: yellow; color: black; border: 1px solid #A0A000;"
 
         # --- تطبيق خلفية النافذة ---
         alpha_value = int(max(0.0, min(1.0, opacity_level)) * 255)
-        final_window_bg_rgba = "rgba(0,0,0,0)" # Default transparent
+        final_window_bg_rgba = "rgba(0,0,0,0)"
 
         if not use_system_colors:
             try:
@@ -346,18 +344,16 @@ class VirtualKeyboard(QMainWindow):
             except Exception as e:
                 print(f"Error applying custom window background color '{window_bg_color_setting}': {e}")
         else:
-             # استخدام لون خلفية النظام مع الشفافية المحددة
              palette = self.palette()
              base_color = palette.color(QPalette.ColorRole.Window)
              final_window_bg_rgba = f"rgba({base_color.red()}, {base_color.green()}, {base_color.blue()}, {alpha_value})"
              print(f"Applying system theme window background ({base_color.name()}) with alpha {alpha_value}")
 
-        # تطبيق النمط على الويدجت المركزي
-        bg_style = f"background-color: {final_window_bg_rgba};"
+        bg_style = f"background-color: {final_window_bg_rgba} !important;"
         self.central_widget.setStyleSheet(f"QWidget#centralWidget {{ {bg_style} }}")
 
         # --- تطبيق الأنماط النهائية ---
-        # Note: We apply the base style, and then override specifics
+        # --- *** تعديل: التأكد من أن النمط modifier_on يطبق فقط على المفاتيح التي تحتاجه *** ---
         full_stylesheet = f"""
             QPushButton {{ {base_button_style} }}
             QPushButton:pressed {{ background-color: #cceeff !important; border: 1px solid #88aabb !important; }}
@@ -365,8 +361,7 @@ class VirtualKeyboard(QMainWindow):
             QPushButton#MinimizeButton, QPushButton#CloseButton {{ {custom_control_style} }}
             QPushButton#DonateButton {{ {donate_style} }}
         """
-        self.setStyleSheet(full_stylesheet) # Apply to the main window
-    # --- *** نهاية التعديل *** ---
+        self.setStyleSheet(full_stylesheet)
 
 
     def update_application_font(self, new_font): self.app_font = QFont(new_font)
@@ -419,9 +414,13 @@ class VirtualKeyboard(QMainWindow):
 
         # Define keys that should support auto-repeat
         repeatable_keys = set(KEY_CHAR_MAP.keys()) | {'Space', 'Backspace', 'Delete', 'Tab', 'Enter', 'Up', 'Down', 'Left', 'Right'}
+        # --- *** تعديل: إضافة Win و App إلى المفاتيح غير المتكررة *** ---
         non_repeatable_functional_keys = {'Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-                                           'PrtSc', 'Scroll Lock', 'Pause', 'Insert', 'Home', 'Page Up', 'End', 'Page Down'}
-        modifier_keys = {'LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'}
+                                           'PrtSc', 'Scroll Lock', 'Pause', 'Insert', 'Home', 'Page Up', 'End', 'Page Down',
+                                           'L Win', 'R Win', 'App'} # Added Win and App here
+        # --- *** تعديل: إزالة Win من مفاتيح التعديل *** ---
+        modifier_keys = {'LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'} # Removed Win keys
+        # --- *** نهاية التعديل *** ---
         special_action_keys = {'About', 'Set', 'Minimize', 'Close', 'Donate', 'Lang'}
 
         for r, row_keys in enumerate(KEYBOARD_LAYOUT):
@@ -447,6 +446,7 @@ class VirtualKeyboard(QMainWindow):
                         elif key_name == 'Close': button.clicked.connect(self.quit_application); button.setObjectName("CloseButton")
                         elif key_name == 'Donate': button.clicked.connect(self._open_donate_link); button.setObjectName("DonateButton") # Set object name here
                     elif key_name in modifier_keys:
+                        # Modifier keys (Shift, Ctrl, Alt, Caps) still toggle state
                         button.setProperty("modifier_on", False)
                         button.clicked.connect(lambda chk=False, k=key_name: self.on_modifier_key_press(k))
                     elif key_name in repeatable_keys: # مفاتيح قابلة للتكرار (بما فيها الأسهم)
@@ -456,8 +456,11 @@ class VirtualKeyboard(QMainWindow):
                         if key_name in KEY_CHAR_MAP:
                             button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
                             button.customContextMenuRequested.connect(lambda pos, k=key_name: self.on_typable_key_right_press(k))
+                    # --- *** تعديل: Win و App يتصلان بـ on_non_repeatable_key_press *** ---
                     elif key_name in non_repeatable_functional_keys:
+                        # Includes Esc, F-keys, AND L Win, R Win, App now
                         button.clicked.connect(lambda chk=False, k=key_name: self.on_non_repeatable_key_press(k))
+                    # --- *** نهاية التعديل *** ---
                     else:
                         print(f"Warning: Key '{key_name}' has no defined action.")
                     # --- نهاية تحديد السلوك ---
@@ -490,11 +493,9 @@ class VirtualKeyboard(QMainWindow):
             except Exception as e:
                  print(f"Tray message failed: {e}")
         elif not self.is_frameless:
-            # نافذة بإطار بدون شريط مهام: قم بالتصغير العادي
             print("No tray, minimizing.")
             self.showMinimized()
         else:
-            # نافذة بدون إطار وبدون شريط مهام: قم بالإخفاء
             print("No tray and frameless, hiding window.")
             self.hide()
 
@@ -510,18 +511,16 @@ class VirtualKeyboard(QMainWindow):
             except Exception as e: print(f"Tray icon error: {e}")
             self.tray_icon.activated.connect(self.tray_icon_activated); print("System tray icon created.")
         else:
-            # Update existing icon if needed
             if self.icon and self.tray_icon.icon().cacheKey() != self.icon.cacheKey():
                  try: print("Updating tray icon..."); self.tray_icon.setIcon(self.icon)
                  except Exception as e: print(f"Tray icon update error: {e}")
 
-        # --- إعادة بناء القائمة دائمًا للتأكد من صحتها ---
-        if self.tray_menu: self.tray_menu.clear() # Clear previous menu items
+        if self.tray_menu: self.tray_menu.clear()
         self.tray_menu = QMenu(self); self.language_menu = None; self.language_actions = {}; self.lang_action_group = None
 
         if self.xkb_manager:
             layouts = self.xkb_manager.get_available_layouts()
-            if layouts and len(layouts) > 1: # Only show layout menu if more than one
+            if layouts and len(layouts) > 1:
                 self.language_menu = QMenu("Select Layout", self); self.lang_action_group = QActionGroup(self); self.lang_action_group.setExclusive(True)
                 for lc in layouts: a = QAction(lc, self, checkable=True); a.triggered.connect(lambda checked=False, l=lc: self.set_system_language_from_menu(l)); self.language_menu.addAction(a); self.language_actions[lc] = a; self.lang_action_group.addAction(a)
                 self.tray_menu.addMenu(self.language_menu); self.tray_menu.addSeparator()
@@ -529,22 +528,15 @@ class VirtualKeyboard(QMainWindow):
         about_action = QAction("About...", self); about_action.triggered.connect(self.show_about_message)
         settings_action = QAction("Settings...", self); settings_action.triggered.connect(self.open_settings_dialog)
         self.tray_menu.addActions([about_action, settings_action])
-
-        # --- إضافة خيار التبرع ---
         donate_action = QAction("Donate...", self)
         donate_action.triggered.connect(self._open_donate_link)
         self.tray_menu.addAction(donate_action)
-        # --- نهاية الإضافة ---
-
         self.tray_menu.addSeparator()
-
         show_act = QAction("Show Keyboard", self); show_act.triggered.connect(self.show_normal_and_raise)
         hide_act = QAction("Hide (Middle Mouse Click)", self); hide_act.setEnabled(self.settings.get("auto_hide_on_middle_click", DEFAULT_SETTINGS.get("auto_hide_on_middle_click", True))); hide_act.triggered.connect(self.hide_to_tray)
         self.tray_menu.addActions([show_act, hide_act]); self.tray_menu.addSeparator()
-
         quit_act = QAction("Quit", self); quit_act.triggered.connect(self.quit_application)
         self.tray_menu.addAction(quit_act); self.tray_icon.setContextMenu(self.tray_menu)
-        # --- نهاية إعادة بناء القائمة ---
 
         if not self.tray_icon.isVisible():
              try: self.tray_icon.show()
@@ -555,7 +547,7 @@ class VirtualKeyboard(QMainWindow):
         if not self.xlib_ok: tooltip_parts.append("Input ERR")
         if self.settings.get("auto_show_on_edit", DEFAULT_SETTINGS.get("auto_show_on_edit", False)): tooltip_parts.append("AutoShow ON")
         if self.always_on_top: tooltip_parts.append("Always On Top")
-        # if self.is_sticky: tooltip_parts.append("Sticky") # إزالة من التلميح
+        # if self.is_sticky: tooltip_parts.append("Sticky")
         try: self.tray_icon.setToolTip("\n".join(tooltip_parts))
         except Exception as e: print(f"Tray tooltip error: {e}")
         self.update_tray_menu_check_state()
@@ -567,14 +559,12 @@ class VirtualKeyboard(QMainWindow):
         if self.isHidden(): self.showNormal(); self.activateWindow(); self.raise_()
 
     def closeEvent(self, event):
-        # --- تعديل: إخفاء إلى شريط المهام عند الإغلاق فقط إذا كان شريط المهام متاحًا ---
         if self.tray_icon and self.tray_icon.isVisible():
             event.ignore()
             self.hide_to_tray()
         else:
-            # إذا لم يكن شريط المهام متاحًا، قم بإنهاء التطبيق عند الإغلاق
-            event.accept() # Accept the event to close
-            self.quit_application() # Ensure cleanup happens
+            event.accept()
+            self.quit_application()
 
     def quit_application(self):
         print("Quit requested...")
@@ -586,7 +576,6 @@ class VirtualKeyboard(QMainWindow):
             except Exception as e: print(f"Error stopping focus monitor: {e}")
         if self.settings.get("remember_geometry", DEFAULT_SETTINGS.get("remember_geometry", True)):
             try:
-                # حفظ الهندسة فقط إذا لم تكن النافذة مصغرة
                 if not self.isMinimized():
                      self.settings["window_geometry"] = {"x": self.geometry().x(),"y": self.geometry().y(),"width": self.geometry().width(),"height": self.geometry().height()}
             except Exception as e: self.settings["window_geometry"] = None; print(f"ERROR getting geometry: {e}")
@@ -1023,12 +1012,21 @@ class VirtualKeyboard(QMainWindow):
         symbol_map = { "Caps Lock": "⇪ Caps", "Tab": "⇥ Tab", "Enter": "↵ Enter", "Backspace": "⌫ Bksp", "Up": "↑", "Down": "↓", "Left": "←", "Right": "→", "L Win": "◆", "R Win": "◆", "App": "☰", "Scroll Lock": "Scroll Lk", "Pause": "Pause", "PrtSc":"PrtSc", "Insert":"Ins", "Home":"Home", "Page Up":"PgUp", "Delete":"Del", "End":"End", "Page Down":"PgDn", "L Ctrl":"Ctrl", "R Ctrl":"Ctrl", "L Alt":"Alt", "R Alt":"AltGr", "Space":"Space", "Esc":"Esc", "About":"About", "Set":"Set", "LShift": "⇧ Shift", "RShift": "⇧ Shift", "Minimize":"_", "Close":"X", "Donate":"Donate"}
         for key_name, button in self.buttons.items():
             if not button: continue; new_label = key_name; toggled = False
-            is_mod = key_name in ['LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock']
+            # --- *** تعديل: إزالة Win من قائمة is_mod *** ---
+            is_mod = key_name in ['LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'] # Win keys are not toggling mods
+            # --- *** نهاية التعديل *** ---
             if key_name == 'Lang': new_label = 'EN' if self.current_language == 'ar' else 'AR'
             elif key_name in ['LShift', 'RShift']: new_label="⇧ Shift"; toggled=self.shift_pressed
             elif key_name in ['L Ctrl', 'R Ctrl']: new_label="Ctrl"; toggled=self.ctrl_pressed
             elif key_name in ['L Alt', 'R Alt']: new_label="Alt" if key_name=='L Alt' else "AltGr"; toggled=self.alt_pressed
+            # --- *** تعديل: إزالة حالة Win/Super المرئية *** ---
+            # elif key_name in ['L Win', 'R Win']: new_label="◆"; toggled=self.win_pressed # Removed toggle state
+            elif key_name in ['L Win', 'R Win']: new_label="◆" # Just set the label
+            # --- *** نهاية التعديل *** ---
             elif key_name == 'Caps Lock': new_label=symbol_map.get(key_name, key_name); toggled=self.caps_lock_pressed
+            # --- *** تعديل: مفتاح App يعامل كرمز فقط *** ---
+            elif key_name == 'App': new_label="☰" # Just set the label
+            # --- *** نهاية التعديل *** ---
             elif key_name in KEY_CHAR_MAP: # Character keys
                 char_map_for_key = KEY_CHAR_MAP[key_name]; char_tuple = char_map_for_key.get(self.current_language, char_map_for_key.get('en', (key_name,)*2))
                 index_to_use = 0; is_letter = key_name.isalpha() and len(key_name)==1; effective_shift = (self.shift_pressed ^ self.caps_lock_pressed) if is_letter else self.shift_pressed
@@ -1036,10 +1034,24 @@ class VirtualKeyboard(QMainWindow):
                 new_label = char_tuple[index_to_use] if index_to_use < len(char_tuple) else char_tuple[0]
             elif key_name in symbol_map: new_label = symbol_map[key_name] # Other symbol keys
             elif key_name.startswith("F") and key_name[1:].isdigit(): new_label = key_name
+
+            # Update text if changed
             if button.text() != new_label: button.setText(new_label)
+
+            # --- *** تعديل: تحديث الخاصية المرئية فقط للمفاتيح المعدلة الفعلية *** ---
+            # Update visual property only for actual toggling modifiers
             if is_mod:
                 current_prop = button.property("modifier_on");
-                if current_prop is None or current_prop != toggled: button.setProperty("modifier_on", toggled); button.style().unpolish(button); button.style().polish(button)
+                if current_prop is None or current_prop != toggled:
+                    button.setProperty("modifier_on", toggled);
+                    button.style().unpolish(button); button.style().polish(button)
+            else:
+                # Ensure non-modifiers don't have the property set
+                current_prop = button.property("modifier_on")
+                if current_prop is not None and current_prop is True:
+                     button.setProperty("modifier_on", False)
+                     button.style().unpolish(button); button.style().polish(button)
+            # --- *** نهاية التعديل *** ---
 
     def _simulate_single_key_press(self, key_name):
         if not key_name: return False
@@ -1056,6 +1068,11 @@ class VirtualKeyboard(QMainWindow):
     def _send_xtest_key(self, key_name, simulate_shift, is_caps_toggle=False):
         """ Sends the low-level XTEST key event sequence. Uses X_CONST alias now. """
         caps_kc = xlib_int.get_caps_lock_keycode(); shift_kc = xlib_int.get_shift_keycode(); ctrl_kc = xlib_int.get_ctrl_keycode(); alt_kc = xlib_int.get_alt_keycode()
+        # --- *** تعديل: إزالة الحصول على win_kc هنا لأنه لا يستخدم كحالة تعديل *** ---
+        # win_keysym = X11_KEYSYM_MAP.get('L Win', 0)
+        # win_kc = xlib_int.keysym_to_keycode(win_keysym) if win_keysym else None
+        # --- *** نهاية التعديل *** ---
+
         if is_caps_toggle:
              if not self.xlib_ok or not caps_kc: print("XTEST Error: Cannot toggle Caps Lock"); return False
              ok = xlib_int.send_xtest_event(X_CONST.KeyPress, caps_kc) and xlib_int.send_xtest_event(X_CONST.KeyRelease, caps_kc)
@@ -1067,25 +1084,40 @@ class VirtualKeyboard(QMainWindow):
         kc = xlib_int.keysym_to_keycode(keysym);
         if not kc: print(f"WARNING: No KeyCode for KeySym {hex(keysym)} ('{key_name}')"); return False
         press_shift = simulate_shift and shift_kc; press_ctrl = self.ctrl_pressed and ctrl_kc; press_alt = self.alt_pressed and alt_kc
+        # --- *** تعديل: إزالة حالة press_win *** ---
+        # press_win = self.win_pressed and win_kc
+        # --- *** نهاية التعديل *** ---
         ok = True
         try:
+            # --- *** تعديل: إزالة إرسال ضغطة Win هنا *** ---
+            # if press_win: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, win_kc)
+            # --- *** نهاية التعديل *** ---
             if press_ctrl: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, ctrl_kc)
             if press_alt: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, alt_kc)
             if press_shift: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, shift_kc)
             if not ok: raise Exception("Mod Press")
+
             ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, kc); ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, kc)
             if not ok: raise Exception("Key Press/Release")
+
             if press_shift: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, shift_kc)
             if press_alt: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, alt_kc)
             if press_ctrl: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, ctrl_kc)
+            # --- *** تعديل: إزالة إرسال إفلات Win هنا *** ---
+            # if press_win: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, win_kc)
+            # --- *** نهاية التعديل *** ---
             if not ok: raise Exception("Mod Release")
             return True
         except Exception as e:
             print(f"ERROR XTEST sequence '{key_name}': {e}"); self._handle_xtest_error()
+            # Attempt to release any potentially stuck modifiers
             try:
                 if press_shift: xlib_int.send_xtest_event(X_CONST.KeyRelease, shift_kc)
                 if press_alt: xlib_int.send_xtest_event(X_CONST.KeyRelease, alt_kc)
                 if press_ctrl: xlib_int.send_xtest_event(X_CONST.KeyRelease, ctrl_kc)
+                # --- *** تعديل: إزالة محاولة إفلات Win في حالة الخطأ *** ---
+                # if press_win: xlib_int.send_xtest_event(X_CONST.KeyRelease, win_kc)
+                # --- *** نهاية التعديل *** ---
             except Exception: pass
             return False
 
@@ -1095,28 +1127,37 @@ class VirtualKeyboard(QMainWindow):
             msg = "X connection lost?" if critical else "Key simulation error."
             QMessageBox.warning(self, "XTEST Error", f"{msg}\nXTEST disabled."); self.init_tray_icon()
 
+    # --- *** تعديل: إزالة معالجة Win هنا *** ---
     def on_modifier_key_press(self, key_name):
+        """ Handles clicks on modifier keys (Shift, Ctrl, Alt, Caps). """
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
         mod_changed = False
         if key_name in ['LShift', 'RShift']: self.shift_pressed = not self.shift_pressed; mod_changed=True
         elif key_name in ['L Ctrl', 'R Ctrl']: self.ctrl_pressed = not self.ctrl_pressed; mod_changed=True
         elif key_name in ['L Alt', 'R Alt']: self.alt_pressed = not self.alt_pressed; mod_changed=True
+        # elif key_name in ['L Win', 'R Win']: self.win_pressed = not self.win_pressed; mod_changed=True # Removed Win handling
         elif key_name == 'Caps Lock':
             sim_success = self._send_xtest_key(key_name, False, is_caps_toggle=True)
             if sim_success: self.caps_lock_pressed = not self.caps_lock_pressed
             else: QMessageBox.warning(self, "Caps Lock Error", "Could not toggle sys Caps Lock.")
             mod_changed = True
         if mod_changed: self.update_key_labels()
+    # --- *** نهاية التعديل *** ---
 
     def on_non_repeatable_key_press(self, key_name):
+        """ Handles clicks on non-repeatable keys like Esc, F-keys, Win, App. """
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
+        # Simulate the key press, respecting current Ctrl/Alt state but not Shift
         sim_ok = self._send_xtest_key(key_name, False) # simulate_shift = False
         released_mods = False
         if sim_ok:
-            # لا تقم بتحرير شيفت تلقائيًا عند الضغط على مفاتيح غير قابلة للتكرار
-            # if self.shift_pressed: self.shift_pressed = False; released_mods = True
+            # Release non-sticky modifiers (Ctrl, Alt) after a non-repeatable key press
+            # We don't release Shift here as it's sticky until a typable key is pressed
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
+            # --- *** تعديل: إزالة تحرير Win هنا *** ---
+            # if self.win_pressed: self.win_pressed = False; released_mods = True
+            # --- *** نهاية التعديل *** ---
         if released_mods: self.update_key_labels()
 
     def _handle_key_pressed(self, key_name):
@@ -1133,6 +1174,9 @@ class VirtualKeyboard(QMainWindow):
             if self.shift_pressed: self.shift_pressed = False; released_mods = True
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
+            # --- *** تعديل: إزالة تحرير Win هنا *** ---
+            # if self.win_pressed: self.win_pressed = False; released_mods = True
+            # --- *** نهاية التعديل *** ---
 
         if released_mods:
              self.update_key_labels()
@@ -1183,6 +1227,9 @@ class VirtualKeyboard(QMainWindow):
             # if self.shift_pressed: self.shift_pressed = False; released_mods = True
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
+            # --- *** تعديل: إزالة تحرير Win هنا *** ---
+            # if self.win_pressed: self.win_pressed = False; released_mods = True
+            # --- *** نهاية التعديل *** ---
         if released_mods: self.update_key_labels()
 
 
