@@ -1,15 +1,16 @@
-# pyxkeyboard v1.0.3
+# pyxkeyboard v1.0.5
 
 A simple, customizable OSK on-screen virtual keyboard for Linux systems (primarily X11/Xorg), featuring layout switching, key simulation via XTEST, and optional auto-show functionality using AT-SPI.
 
 ![Screenshot](placeholder.png)
+*(Suggestion: Replace placeholder.png with an actual screenshot)*
 
 ## Key Features
 
 *   **On-Screen Typing:** Click keys to simulate input into other applications (using XTEST).
-*   **System Layout Switching:** Easily switch between configured system keyboard layouts (e.g., English, Arabic) using the `Lang` button or the system tray menu (requires `setxkbmap`).
-*   **Visual Layout Display:** Keyboard display automatically reflects the currently active system layout.
-*   **Modifier Keys:** Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Modifiers like Shift, Ctrl, Alt auto-release after the next non-modifier key press.
+*   **System Layout Switching:** Easily switch between configured system keyboard layouts (e.g., English, Arabic) using the `Lang` button or the system tray menu (uses `xkb-switch` if available, otherwise `setxkbmap`).
+*   **Visual Layout Display:** Keyboard display automatically reflects the currently active system layout (loads characters from corresponding layout files like `layouts/us.json`, `layouts/ar.json`).
+*   **Modifier Keys:** Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next non-modifier key press. `Win`/`Super` keys act as single-press keys.
 *   **Right-Click Shift:** Right-click character keys to simulate `Shift + Key`.
 *   **Movable:** Drag the window background using the **left mouse button** to reposition (works whether frameless or framed).
 *   **Always on Top:** Option to keep the keyboard window visible above other application windows (Default: On).
@@ -17,10 +18,8 @@ A simple, customizable OSK on-screen virtual keyboard for Linux systems (primari
 *   **Key Auto-Repeat:** Enable/disable key repeat on long press (includes arrow keys, backspace, delete, space, tab, enter, letters, numbers, symbols) and configure initial delay and repeat interval.
 *   **Customizable Appearance:**
     *   Adjust font family and size (Default: Noto Naskh Arabic 10pt).
-    *   Change button text color.
-    *   Optionally use **system theme colors** for window and button backgrounds (Default: On). If enabled:
-        *   Button text color (black/white) is automatically chosen for contrast against the theme's button background.
-        *   Custom background color settings and the "Button Style" setting are ignored.
+    *   Set button text color.
+    *   Optionally use **system theme colors** for window and button backgrounds (Default: On). If enabled, custom background color and button style settings are ignored, but the set text color is still used.
     *   If *not* using system colors:
         *   Set custom window background color.
         *   Set custom button background color (mainly affects "Flat" style).
@@ -31,130 +30,112 @@ A simple, customizable OSK on-screen virtual keyboard for Linux systems (primari
     *   Remember window position and size.
     *   Optional middle-click on background to hide to tray.
     *   **Auto-show when editing text:** Automatically shows the keyboard when focus enters an editable text field (requires AT-SPI accessibility services).
-    *   **Show on all workspaces (Sticky):** _[Option available but Not Currently Functional]_ Intended to make the keyboard visible on all virtual desktops.
-![Screenshot](placeholder2.png)
+    *   **Show on all workspaces (Sticky):** _[Option available but Not Currently Functional]_
+
+![Settings Screenshot](placeholder2.png)
+*(Suggestion: Replace placeholder2.png with a screenshot of the settings window)*
+
 ## System Requirements
 
 *   **Operating System:** **Linux** (Designed and tested primarily on **X11/Xorg** sessions).
-    *   *Note:* Key simulation (XTEST), system layout switching (`setxkbmap`), focus monitoring (AT-SPI), and window manager hints (Always on Top, Sticky) may have limited or no functionality on Wayland sessions depending on the compositor and configuration.
+    *   *Note:* Key simulation (XTEST), system layout switching (XKB), focus monitoring (AT-SPI), and window manager hints (Always on Top, Sticky) may have limited or no functionality on Wayland sessions.
 *   **Python:** Python 3.x
 
 ## Installation & Dependencies
 
-Follow these steps to get `pyxkeyboard` running:
-
 **1. Dependencies:**
 
-You need Python 3 and several libraries. Installation commands are shown for Debian/Ubuntu-based systems. Use your distribution's package manager for equivalents.
-![Screenshot](placeholder3.png)
-*   **Core GUI (PyQt6):**
+Ensure the following packages are installed on your Debian/Ubuntu-based system. Use your distribution's package manager for equivalents on other systems.
+
+![Dependencies Screenshot](placeholder3.png)
+*(Suggestion: Replace placeholder3.png with a relevant image if desired)*
+
+*   **Required:**
     ```bash
     sudo apt update
-    sudo apt install python3-pyqt6
-    # Or using pip: python3 -m pip install PyQt6
+    sudo apt install python3 python3-pyqt6 python3-xlib x11-xkb-utils
     ```
-*   **Key Simulation (XTEST) & Window Properties (Sticky dependency):**
+    *(Provides: Python interpreter, Core GUI, Key simulation, Layout switching command)*
+
+*   **Recommended (for Optional Features):**
     ```bash
-    sudo apt install python3-xlib
-    # Or using pip: python3 -m pip install python-xlib
-    ```
-*   **System Layout Switching (`setxkbmap` command):**
-    This command is usually pre-installed with Xorg. If missing:
-    ```bash
-    sudo apt install x11-xkb-utils
-    ```
-*   **Auto-Show Feature (AT-SPI):** *(Optional, recommended for auto-show)*
-    These are often installed by default on modern desktops, but if the feature doesn't work, ensure they are present:
-    ```bash
-    # Install Python GI bindings and AT-SPI introspection data
+    # For Auto-Show feature:
     sudo apt install python3-gi gir1.2-atspi-2.0
 
-    # IMPORTANT: Ensure Accessibility Services (AT-SPI Bus) are enabled!
-    # Check your Desktop Environment's settings (Accessibility/Universal Access).
-    # You might need to log out and back in after enabling it.
-    # You can often check if it's running via: ps aux | grep -i at-spi
-    ```
-*   **(Optional) Fonts:** For the default appearance, install `fonts-noto-naskh-arabic`.
-    ```bash
+    # For default font:
     sudo apt install fonts-noto-naskh-arabic
     ```
+    *Note: The Auto-Show feature also requires **Accessibility Services (AT-SPI Bus)** to be enabled in your Desktop Environment settings (check Accessibility/Universal Access). You might need to log out and log back in after enabling it.*
 
-**2. Get the Code:**
+**2. Installation (using DEB package):**
 
-Clone the repository (replace with your actual repo URL if different):
-```bash
-git clone https://github.com/your-username/pyxkeyboard.git
-cd pyxkeyboard
-```
-Or download the source code archive.
+This is the recommended installation method for end-users on Debian/Ubuntu-based systems.
 
-**3. Installation (Choose ONE method):**
-
-    # Install the  .deb file
+1.  **Download:** Obtain the `pyxkeyboard_*.deb` file for the latest release.
+2.  **Install:** Open a terminal in the directory where you downloaded the file and run:
+    ```bash
     sudo dpkg -i pyxkeyboard_*.deb
-    # Fix any missing dependencies (if any were missed above)
+    ```
+    *(Replace `*` with the actual version/architecture)*
+3.  **Fix Dependencies (If necessary):** If `dpkg` reports missing dependencies that weren't installed in Step 1, run:
+    ```bash
     sudo apt --fix-broken install
-    # Update icon cache (Important!)
+    ```
+4.  **Update Caches (Important!):** To ensure the application icon and menu entry appear correctly, run:
+    ```bash
     sudo gtk-update-icon-cache /usr/share/icons/hicolor/
-    # Update desktop database
     sudo update-desktop-database
     ```
-    After installation, you should find "PyXKeyboard" in your application menu.
-    To uninstall: `sudo apt remove pyxkeyboard`
+5.  **Log Out/In:** Log out of your desktop session and log back in for the menu/icon changes to take full effect.
 
-*   **Method C: Running Directly (for quick tests, not recommended for regular use):**
-    ```bash
-    # From the project root directory
-    python3 -m pyxkeyboard.main
-    ```
+You should now find "PyXKeyboard" in your application menu.
+
+**To Uninstall:**
+```bash
+sudo apt remove pyxkeyboard
+```
+
+**(Alternative) Running Directly:**
+For development or testing without installation:
+```bash
+# Clone the repository first if you haven't already
+# git clone https://github.com/khaled151277/pyxkeyboard.git
+# cd pyxkeyboard
+# From the project root directory:
+python3 -m pyxkeyboard.main
+```
 
 ## How to Use
 
-1.  **Starting:** Launch "PyXKeyboard" from your application menu (if installed via DEB) or run `pyxkeyboard` or `python3 -m pyxkeyboard.main` from the terminal.
-2.  **Typing:** Open your target application (e.g., text editor), then click keys on the virtual keyboard. Characters should appear if XTEST works.
-3.  **Modifiers:**
-    *   Click `Shift`, `Ctrl`, or `Alt` once. It highlights. Click the next non-modifier character or function key. The modifier then releases automatically.
-    *   Right-clicking a character key simulates Shift + that key directly.
-    *   Click `Caps Lock` to toggle the system's Caps Lock state (requires XTEST).
-4.  **Using Arrow Keys:** Click the arrow keys (<code>↑</code>, <code>↓</code>, <code>←</code>, <code>→</code>). Long-pressing them will trigger auto-repeat if enabled.
-5.  **Switching Layouts:**
-    *   Click the `Lang` button (e.g., `AR` or `EN`) to cycle through system layouts.
-    *   Right-click the **keyboard tray icon** -> "Select Layout" -> Choose layout (requires `setxkbmap` and multiple layouts configured in system).
-6.  **Moving:** Click and drag the keyboard's background area with the **left mouse button**.
-7.  **Minimizing / Hiding:**
-    *   Click the standard close button (`X`) if the window has a frame. Hides to tray if available, otherwise quits.
-    *   Click the custom `_` button (if frameless). Hides to tray if available, otherwise hides.
-    *   If enabled in Settings, **middle-click** (mouse wheel click) anywhere on the keyboard's background area (not a button) to hide it to the tray/minimize/hide.
-8.  **Showing from Tray:**
-    *   **Left-click** the **keyboard icon** in the system tray.
-    *   **Right-click** the **keyboard icon** -> "Show Keyboard".
-9.  **Settings:** Click the **<code>Set</code>** button to open the Settings & Help window (fixed size 500x500). Configure:
-    *   **General Tab:** Remember Geometry, Always on Top, Sticky (Not Functional), Middle-click Hide, Auto-Show, Frameless Window.
-    *   **Appearance Tab:** Font, Button Text Color, Use System Theme Colors (overrides custom backgrounds/button style), Custom Window/Button Background Colors, Background Opacity, Custom Button Style (disabled if using system colors).
-    *   **Typing Tab:** Enable/disable Auto-Repeat, configure Delay and Interval.
-    *   **Help Tabs:** View help guides (English and Arabic).
-10. **Quitting:**
-    *   Click the custom `X` button (if frameless).
-    *   Right-click the **keyboard tray icon** -> "Quit".
-    *   Close the window via the standard close button if it's framed and no system tray is available.
+1.  **Starting:** Launch "PyXKeyboard" from your application menu or run `pyxkeyboard` in the terminal.
+2.  **Typing:** Open your target application, then click keys on the virtual keyboard.
+3.  **Modifiers:** Click `Shift`, `Ctrl`, or `Alt` once to activate for the next key. Click `Caps Lock` to toggle. Right-click character keys for Shift+Key. `Win`/`Super` keys act as single presses.
+4.  **Arrow Keys & Repeat:** Click arrow keys or other repeatable keys. Long-press triggers auto-repeat if enabled.
+5.  **Switching Layouts:** Use the `Lang` button to cycle or right-click the tray icon -> "Select Layout". The display updates based on `.json` files in the installation's `layouts` directory.
+6.  **Moving:** Left-click and drag the background area.
+7.  **Minimizing / Hiding:** Use window controls, the custom `_` button (if frameless), or middle-click the background (if enabled).
+8.  **Showing from Tray:** Left-click the tray icon or use the right-click menu.
+9.  **Settings (<code>Set</code> button):** Configure appearance and behavior (500x500 window). Note that "Use system theme colors" overrides custom backgrounds and button style, but respects the custom text color setting.
+10. **Quitting:** Use the custom `X` button (if frameless), the tray menu, or the standard window close button (if framed and no tray).
 
 ## Troubleshooting
 
-*   **Typing doesn't work / wrong characters:** Check XTEST status in "About". Ensure `python-xlib` is installed and you're likely on X11/Xorg, not Wayland. Wrong characters might mean system layout (`setxkbmap`) differs from visual expectation.
-*   **Language switching doesn't work:** Check XKB status in "About". Ensure `setxkbmap` (from `x11-xkb-utils`) is installed. You might need multiple layouts configured in your OS settings.
-*   **Tray icon missing:** System tray support might be missing or need configuration on some desktops.
-*   **Middle-click hide doesn't work:** Ensure option is checked in Settings -> General.
-*   **Auto-Show doesn't work:** Ensure option is checked. Verify AT-SPI dependencies (`python3-gi`, `gir1.2-atspi-2.0`) are installed and **Accessibility Services (AT-SPI Bus) are running** in your system/desktop settings (may require logout/login). Check AT-SPI status in "About". Less reliable on Wayland.
-*   **Window doesn't stay on top:** Ensure "Always on Top" is checked in Settings. Feature depends on Window Manager support.
-*   **"Sticky" option doesn't work:** This feature (making the window appear on all workspaces) is currently **not functional**.
-*   **Appearance issues (Transparency/Colors):** Background opacity and custom colors might look different or have artifacts depending on your Window Manager and whether a compositor is running. Using system theme colors is generally more reliable for button appearance. If using custom colors, the "Flat" button style is most affected by the "Button Background Color" setting.
-*   **Application icon is generic:** After installing the DEB package, run `sudo gtk-update-icon-cache /usr/share/icons/hicolor/ && sudo update-desktop-database` and then log out and log back in.
-*   **Settings not saved/loaded correctly:** Ensure the directory `~/.pyxkeyboard` exists and your user has write permissions. Delete the `settings.json` file inside it to reset to defaults if needed.
+*   **Typing doesn't work / wrong characters:** Check XTEST status in "About". Ensure `python-xlib` installed, you're on X11. Wrong characters usually mean system layout differs from keyboard's visual layout (e.g., system AZERTY vs visual QWERTY).
+*   **Correct language characters not displayed:** Ensure a `.json` file matching your system layout code (e.g., `ara.json`) exists in `/usr/lib/python*/site-packages/pyxkeyboard/layouts/`. Check logs for loading errors.
+*   **Language switching fails:** Check XKB status in "About". Ensure `xkb-switch` or `setxkbmap` is installed. Configure multiple layouts in OS settings.
+*   **Tray icon missing:** Your desktop might lack tray support.
+*   **Middle-click hide fails:** Check the setting in General tab.
+*   **Auto-Show fails:** Check setting, ensure AT-SPI dependencies installed AND Accessibility Services are **enabled** in desktop settings (may require logout/login). Check AT-SPI status in "About".
+*   **Always on Top fails:** Check setting. Depends on Window Manager support.
+*   **"Sticky" option:** Not functional currently.
+*   **Appearance issues:** Opacity/colors depend on compositor. If using system colors, ensure your chosen text color contrasts well with your theme.
+*   **Generic Application Icon:** Run `sudo gtk-update-icon-cache /usr/share/icons/hicolor/ && sudo update-desktop-database` then **log out and log back in**.
+*   **Settings issues:** Check permissions for `~/.pyxkeyboard`. Delete `settings.json` inside to reset.
 
 ## About
 
-*   **Version:** 1.0.3
+*   **Version:** 1.0.5
 *   **Developer:** Khaled Abdelhamid
 *   **Contact:** khaled1512@gmail.com
 *   **License:** GPL-3.0
-*   **Support:** If you find this useful, consider supporting development via PayPal: [paypal.me/kh1512](https://paypal.me/kh1512)
+*   **Support:** PayPal: [paypal.me/kh1512](https://paypal.me/kh1512) (<code>paypal.me/kh1512</code>)
