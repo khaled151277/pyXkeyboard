@@ -1,22 +1,21 @@
 # -*- coding: utf-8 -*-
 # file:key_definition.py
-# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# PyXKeyboard v1.0.4 - A simple, customizable on-screen virtual keyboard.
 # Features include X11 key simulation (XTEST), system layout switching (XKB),
 # visual layout updates, configurable appearance (fonts, colors, opacity, styles),
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.
 # Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
-# Defines keyboard layout, character mappings, and X11 keysym constants.
+# Defines keyboard layout, X11 keysym constants, and fallback character map.
 
 from .xlib_integration import XK
 
-# --- KeySym / Character / Layout Definitions ---
-
+# --- KeySym Definitions ---
 X11_KEYSYM_MAP = {
     'Esc': XK.XK_Escape, 'Tab': XK.XK_Tab, 'Caps Lock': XK.XK_Caps_Lock,
     'LShift': XK.XK_Shift_L, 'RShift': XK.XK_Shift_R,
     'L Ctrl': XK.XK_Control_L, 'R Ctrl': XK.XK_Control_R,
     'L Win': XK.XK_Super_L,
-    'R Win': 0xfe08, # Changed from 0xce to user-specified 0xfe08 (Often XK_Super_R)
+    'R Win': 0xfe08, # XK_Super_R often
     'L Alt': XK.XK_Alt_L, 'R Alt': XK.XK_Alt_R,
     'App': XK.XK_Menu, 'Enter': XK.XK_Return, 'Backspace': XK.XK_BackSpace,
     'Space': XK.XK_space, 'PrtSc': XK.XK_Print, 'Scroll Lock': XK.XK_Scroll_Lock,
@@ -45,52 +44,50 @@ X11_KEYSYM_MAP = {
     'Donate': None,
 }
 
-KEY_CHAR_MAP = {
+# --- *** تعديل: الخريطة الأساسية تحتوي فقط على الإنجليزية كاحتياطي *** ---
+# Fallback character map (primarily English layout)
+# Used if a specific layout file isn't found or a key isn't defined in it.
+FALLBACK_CHAR_MAP = {
     # Row 1 (Numbers)
-    '`': {'en': ('`', '~'), 'ar': ('ذ', 'ّ')},
-    '1': {'en': ('1', '!'), 'ar': ('١', '!')}, '2': {'en': ('2', '@'), 'ar': ('٢', '@')},
-    '3': {'en': ('3', '#'), 'ar': ('٣', '#')}, '4': {'en': ('4', '$'), 'ar': ('٤', '$')},
-    '5': {'en': ('5', '%'), 'ar': ('٥', '%')}, '6': {'en': ('6', '^'), 'ar': ('٦', '^')},
-    '7': {'en': ('7', '&'), 'ar': ('٧', '&')}, '8': {'en': ('8', '*'), 'ar': ('٨', '*')},
-    '9': {'en': ('9', '('), 'ar': ('٩', '(')}, '0': {'en': ('0', ')'), 'ar': ('٠', ')')},
-    '-': {'en': ('-', '_'), 'ar': ('-', '_')}, '=': {'en': ('=', '+'), 'ar': ('=', '+')},
+    '`': {'en': ('`', '~')},
+    '1': {'en': ('1', '!')}, '2': {'en': ('2', '@')},
+    '3': {'en': ('3', '#')}, '4': {'en': ('4', '$')},
+    '5': {'en': ('5', '%')}, '6': {'en': ('6', '^')},
+    '7': {'en': ('7', '&')}, '8': {'en': ('8', '*')},
+    '9': {'en': ('9', '(')}, '0': {'en': ('0', ')')},
+    '-': {'en': ('-', '_')}, '=': {'en': ('=', '+')},
     # Row 2 (QWERTY)
-    'Q': {'en': ('q', 'Q'), 'ar': ('ض', 'َ')}, 'W': {'en': ('w', 'W'), 'ar': ('ص', 'ً')},
-    'E': {'en': ('e', 'E'), 'ar': ('ث', 'ُ')}, 'R': {'en': ('r', 'R'), 'ar': ('ق', 'ٌ')},
-    'T': {'en': ('t', 'T'), 'ar': ('ف', 'ﻹ')}, 'Y': {'en': ('y', 'Y'), 'ar': ('غ', 'إ')},
-    'U': {'en': ('u', 'U'), 'ar': ('ع', '‘')}, 'I': {'en': ('i', 'I'), 'ar': ('ه', '÷')},
-    'O': {'en': ('o', 'O'), 'ar': ('خ', '×')}, 'P': {'en': ('p', 'P'), 'ar': ('ح', '؛')},
-    '[': {'en': ('[', '{'), 'ar': ('ج', '<')}, ']': {'en': (']', '}'), 'ar': ('د', '>')},
-    '\\':{'en': ('\\', '|'),'ar': ('\\', '|')},
+    'Q': {'en': ('q', 'Q')}, 'W': {'en': ('w', 'W')},
+    'E': {'en': ('e', 'E')}, 'R': {'en': ('r', 'R')},
+    'T': {'en': ('t', 'T')}, 'Y': {'en': ('y', 'Y')},
+    'U': {'en': ('u', 'U')}, 'I': {'en': ('i', 'I')},
+    'O': {'en': ('o', 'O')}, 'P': {'en': ('p', 'P')},
+    '[': {'en': ('[', '{')}, ']': {'en': (']', '}')},
+    '\\':{'en': ('\\', '|')},
     # Row 3 (ASDF)
-    'A': {'en': ('a', 'A'), 'ar': ('ش', 'ِ')}, 'S': {'en': ('s', 'S'), 'ar': ('س', 'ٍ')},
-    'D': {'en': ('d', 'D'), 'ar': ('ي', ']')}, 'F': {'en': ('f', 'F'), 'ar': ('ب', '[')},
-    'G': {'en': ('g', 'G'), 'ar': ('ل', 'ﻷ')}, 'H': {'en': ('h', 'H'), 'ar': ('ا', 'أ')},
-    'J': {'en': ('j', 'J'), 'ar': ('ت', 'ـ')}, 'K': {'en': ('k', 'K'), 'ar': ('ن', '،')},
-    'L': {'en': ('l', 'L'), 'ar': ('م', '/')}, ';': {'en': (';', ':'), 'ar': ('ك', ':')},
-    "'": {'en': ("'", '"'), 'ar': ('ط', '"')},
+    'A': {'en': ('a', 'A')}, 'S': {'en': ('s', 'S')},
+    'D': {'en': ('d', 'D')}, 'F': {'en': ('f', 'F')},
+    'G': {'en': ('g', 'G')}, 'H': {'en': ('h', 'H')},
+    'J': {'en': ('j', 'J')}, 'K': {'en': ('k', 'K')},
+    'L': {'en': ('l', 'L')}, ';': {'en': (';', ':')},
+    "'": {'en': ("'", '"')},
     # Row 4 (ZXCV)
-    'Z': {'en': ('z', 'Z'), 'ar': ('ئ', '~')}, 'X': {'en': ('x', 'X'), 'ar': ('ء', 'ْ')},
-    'C': {'en': ('c', 'C'), 'ar': ('ؤ', '}')}, 'V': {'en': ('v', 'V'), 'ar': ('ر', '{')},
-    'B': {'en': ('b', 'B'), 'ar': ('لا', 'ﻵ')}, 'N': {'en': ('n', 'N'), 'ar': ('ى', 'آ')},
-    'M': {'en': ('m', 'M'), 'ar': ('ة', '’')}, ',': {'en': (',', '<'), 'ar': ('و', ',')},
-    '.': {'en': ('.', '>'), 'ar': ('ز', '.')}, '/': {'en': ('/', '?'), 'ar': ('ظ', '؟')},
+    'Z': {'en': ('z', 'Z')}, 'X': {'en': ('x', 'X')},
+    'C': {'en': ('c', 'C')}, 'V': {'en': ('v', 'V')},
+    'B': {'en': ('b', 'B')}, 'N': {'en': ('n', 'N')},
+    'M': {'en': ('m', 'M')}, ',': {'en': (',', '<')},
+    '.': {'en': ('.', '>')}, '/': {'en': ('/', '?')},
 }
+# --- *** نهاية التعديل *** ---
 
 
-# --- تم التحديث: تغيير مكان زر التبرع وتعديل الصفوف الأخرى ---
+# --- Keyboard Layout Structure (unchanged visually) ---
 KEYBOARD_LAYOUT = [
-    # Row 1: Function keys row (Unchanged)
     [('Esc', 1, 1), ('F1', 1, 1), ('F2', 1, 1), ('F3', 1, 1), ('F4', 1, 1), None, ('F5', 1, 1), ('F6', 1, 1), ('F7', 1, 1), ('F8', 1, 1), None, ('F9', 1, 1), ('F10', 1, 1), ('F11', 1, 1), ('F12', 1, 1), None, ('Minimize', 1, 2), ('Close', 1, 2)],
-    # Row 2: Number row (Unchanged)
     [('`', 1, 1), ('1', 1, 1), ('2', 1, 1), ('3', 1, 1), ('4', 1, 1), ('5', 1, 1), ('6', 1, 1), ('7', 1, 1), ('8', 1, 1), ('9', 1, 1), ('0', 1, 1), ('-', 1, 1), ('=', 1, 1), ('Backspace', 1, 2), None, ('PrtSc', 1, 1), ('Scroll Lock', 1, 1), ('Pause', 1, 1), ('Lang', 1, 1)],
-    # Row 3: QWERTY row (Donate button removed from here)
     [('Tab', 1, 2), ('Q', 1, 1), ('W', 1, 1), ('E', 1, 1), ('R', 1, 1), ('T', 1, 1), ('Y', 1, 1), ('U', 1, 1), ('I', 1, 1), ('O', 1, 1), ('P', 1, 1), ('[', 1, 1), (']', 1, 1), ('\\', 1, 1), None, ('Insert', 1, 1), ('Home', 1, 1), ('Page Up', 1, 1), ('About', 1, 1)],
-    # Row 4: ASDF row (User Modified previously)
-    [('Caps Lock', 1, 2), ('A', 1, 1), ('S', 1, 1), ('D', 1, 1), ('F', 1, 1), ('G', 1, 1), ('H', 1, 1), ('J', 1, 1), ('K', 1, 1), ('L', 1, 1), (';', 1, 1), ("'", 1, 1), ('Enter', 1, 2), None, ('Delete', 1, 1), ('End', 1, 1), ('Page Down', 1, 1), ('Set', 1, 1)], # Replaced Donate with None
-    # Row 5: ZXCV row (User Modified previously)
+    [('Caps Lock', 1, 2), ('A', 1, 1), ('S', 1, 1), ('D', 1, 1), ('F', 1, 1), ('G', 1, 1), ('H', 1, 1), ('J', 1, 1), ('K', 1, 1), ('L', 1, 1), (';', 1, 1), ("'", 1, 1), ('Enter', 1, 2), None, ('Delete', 1, 1), ('End', 1, 1), ('Page Down', 1, 1), ('Set', 1, 1)],
     [('LShift', 1, 3), ('Z', 1, 1), ('X', 1, 1), ('C', 1, 1), ('V', 1, 1), ('B', 1, 1), ('N', 1, 1), ('M', 1, 1), (',', 1, 1), ('.', 1, 1), ('/', 1, 1), ('RShift', 1, 3), None, ('Up', 1, 1), None, None ],
-    # Row 6: Bottom row (User Modified previously, Donate added here)
-    [('L Ctrl', 1, 2), ('L Win', 1, 1), ('L Alt', 1, 1), ('Space', 1, 7), ('R Alt', 1, 1), ('R Win', 1, 1), ('App', 1, 1), ('R Ctrl', 1, 2), ('Left', 1, 1), ('Down', 1, 1), ('Right', 1, 1), ('Donate', 1, 1)] # Replaced last None with Donate
+    [('L Ctrl', 1, 2), ('L Win', 1, 1), ('L Alt', 1, 1), ('Space', 1, 7), ('R Alt', 1, 1), ('R Win', 1, 1), ('App', 1, 1), ('R Ctrl', 1, 2), ('Left', 1, 1), ('Down', 1, 1), ('Right', 1, 1), ('Donate', 1, 1)]
 ]
 # file:key_definition.py

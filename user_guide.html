@@ -110,166 +110,117 @@
 </head>
 <body>
 
-    <h1>Python XKeyboard - User Guide (v1.0.2)</h1>
+    <h1>Python XKeyboard - User Guide (v1.0.5)</h1>
 
-    <p>Welcome to Python XKeyboard! This is a simple on-screen virtual keyboard that helps you type and switch between keyboard layouts (like English and Arabic) easily, with several customization options.</p>
+    <p>Welcome to Python XKeyboard! This is a simple, customizable on-screen virtual keyboard for Linux systems (primarily X11/Xorg). It helps you type, switch between keyboard layouts (e.g., English, Arabic) easily, and simulate key presses, with several customization options.</p>
 
-    <h2>Key Features:</h2>
+    <h2>Key Features</h2>
     <ul>
-        <li><strong>On-Screen Typing:</strong> Click keys on the virtual keyboard to type into other applications (requires XTEST, usually works on X11/Xorg).</li>
-        <li><strong>System Language Switching:</strong> Quickly switch your system's keyboard layout via the <code>Lang</code> button or tray menu (uses <code>setxkbmap</code>).</li>
-        <li><strong>Visual Layout Display:</strong> The virtual keyboard automatically updates to show characters for the current system layout.</li>
-        <li><strong>Modifier Keys:</strong> Functional <code>Shift</code>, <code>Ctrl</code>, <code>Alt</code>, and <code>Caps Lock</code> keys. Modifiers like Shift, Ctrl, Alt auto-release after the next non-modifier key press.</li>
-        <li><strong>Right-Click Shift:</strong> Right-click on a character key to simulate Shift + that key.</li>
-        <li><strong>Movable:</strong> Click and drag the keyboard's background area with the **left mouse button** to move it.</li>
-        <li><strong>Always on Top:</strong> Option to keep the window visible above other application windows.</li>
-        <li><strong>System Tray Integration:</strong> Minimize to tray, select layout, show/quit from tray menu (uses a keyboard icon).</li>
+        <li><strong>On-Screen Typing:</strong> Click keys to simulate input into other applications (using XTEST).</li>
+        <li><strong>System Layout Switching:</strong> Easily switch between configured system keyboard layouts using the <code>Lang</code> button or the system tray menu (uses <code>xkb-switch</code> if available, otherwise `setxkbmap`).</li>
+        <li><strong>Visual Layout Display:</strong> Keyboard display automatically reflects the currently active system layout (loads characters from corresponding layout files like `layouts/us.json`, `layouts/ar.json`).</li>
+        <li><strong>Modifier Keys:</strong> Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next non-modifier key press.</li>
+        <li><strong>Right-Click Shift:</strong> Right-click character keys to simulate `Shift + Key`.</li>
+        <li><strong>Movable:</strong> Drag the window background using the **left mouse button** to reposition.</li>
+        <li><strong>Always on Top:</strong> Option to keep the keyboard window visible above other application windows (Default: On).</li>
+        <li><strong>System Tray Integration:</strong> Minimize to tray, select layout, show keyboard, and quit from the tray menu (uses a keyboard icon).</li>
+        <li><strong>Key Auto-Repeat:</strong> Enable/disable key repeat on long press (includes arrow keys, backspace, delete, space, tab, enter, letters, numbers, symbols) and configure initial delay and repeat interval.</li>
         <li><strong>Customizable Appearance:</strong>
             <ul>
-                <li>Adjust font family and size.</li>
-                <li>Change button text color.</li>
-                <li>Optionally use **system theme colors** for window and button backgrounds. If enabled, button text color (black/white) will be automatically chosen for contrast, and custom background/style settings are ignored.</li>
-                <li>If not using system colors:
+                <li>Adjust font family and size (Default: Noto Naskh Arabic 10pt).</li>
+                <li>Set button text color (applied even when using system colors, except for Donate button).</li>
+                <li>Optionally use **system theme colors** for window and button backgrounds (Default: On). If enabled, custom background color and button style settings are ignored.</li>
+                <li>If *not* using system colors:
                     <ul>
                         <li>Set custom window background color.</li>
                         <li>Set custom button background color (mainly affects "Flat" style).</li>
                         <li>Choose button style (Default, Flat, Gradient).</li>
                     </ul>
                 </li>
-                <li>Set window background **opacity** (works for both framed and frameless windows, compositor support required).</li>
+                <li>Set window background **opacity** (works for both framed and frameless windows, compositor support required, Default: 0.9).</li>
             </ul>
         </li>
         <li><strong>Configurable Behavior:</strong>
             <ul>
                 <li>**Frameless Window:** Option to remove the window title bar and borders (Default: On).</li>
                 <li>Remember window position and size.</li>
-                <li>Optionally minimize/hide the window by middle-clicking its background.</li>
+                <li>Optional middle-click on background to hide to tray.</li>
                 <li>**Auto-show when editing text:** Automatically shows the keyboard when focus enters an editable text field (requires AT-SPI accessibility services).</li>
-                <li>**Key Auto-Repeat:** Enable/disable key repeat on long press (includes arrow keys) and configure initial delay and repeat interval.</li>
-                <li>**Show on all workspaces (Sticky):** _[Option available but Not Currently Functional]_ Intended to make the keyboard visible on all virtual desktops.</li>
+                <li>**Show on all workspaces (Sticky):** _[Option available but Not Currently Functional]_</li>
             </ul>
         </li>
     </ul>
 
-    <h2>How to Use:</h2>
+    <h2>How to Use</h2>
     <ol>
         <li>
-            <strong>Starting the Keyboard:</strong> Launch "PyXKeyboard" from your application menu or run <code>pyxkeyboard</code> in the terminal.
+            <strong>Starting:</strong> Launch "PyXKeyboard" from your application menu or run <code>pyxkeyboard</code> in the terminal.
         </li>
         <li>
-            <strong>Typing:</strong> Open your target application (e.g., text editor), then click keys on the virtual keyboard. Characters should appear if XTEST works.
+            <strong>Typing:</strong> Open your target application, then click keys on the virtual keyboard.
         </li>
         <li>
-            <strong>Using Modifiers (Shift, Ctrl, Alt):</strong>
-            <ul>
-                <li>Click <code>Shift</code>, <code>Ctrl</code>, or <code>Alt</code> once. It highlights. Click the next non-modifier character or function key. The modifier then releases automatically.</li>
-                <li>Right-clicking a character key (e.g., right-click <code>a</code>) simulates Shift+A directly.</li>
-            </ul>
+            <strong>Modifiers:</strong> Click <code>Shift</code>, <code>Ctrl</code>, or <code>Alt</code> once to activate for the next key press. Click <code>Caps Lock</code> to toggle system Caps Lock. Right-click character keys for Shift+Key.
         </li>
          <li>
-            <strong>Using Caps Lock:</strong> Click the <code>⇪ Caps</code> key. It toggles both the system's Caps Lock state (if XTEST works) and the visual appearance of letter keys on the virtual keyboard.
-        </li>
-         <li>
-            <strong>Using Arrow Keys:</strong> Click the arrow keys (<code>↑</code>, <code>↓</code>, <code>←</code>, <code>→</code>). Long-pressing them will trigger auto-repeat if enabled.
+            <strong>Arrow Keys & Repeat:</strong> Click arrow keys or other repeatable keys. Long-press triggers auto-repeat if enabled in Settings.
         </li>
         <li>
-            <strong>Switching Languages (Layouts):</strong>
+            <strong>Switching Layouts:</strong> Use the <code>Lang</code> button to cycle or right-click the tray icon to select a specific layout. The keyboard display will update based on layout files found in the `layouts` directory (e.g., `ar.json`, `fr.json`).
+        </li>
+        <li>
+            <strong>Moving:</strong> Left-click and drag the background area.
+        </li>
+        <li>
+            <strong>Minimizing / Hiding:</strong> Use window controls (if framed), the custom `_` button (if frameless), or middle-click the background (if enabled).
+        </li>
+        <li>
+            <strong>Showing from Tray:</strong> Left-click the tray icon or use the right-click menu.
+        </li>
+        <li>
+            <strong>Settings (<code>Set</code> button):</strong>
             <ul>
-                <li><strong>Using the <code>Lang</code> button:</strong> Click the button labeled <code>AR</code> or <code>EN</code>. It cycles the system layout (if possible) and updates the virtual keyboard display.</li>
-                <li><strong>Using the System Tray:</strong> Right-click the keyboard tray icon, go to "Select Layout", and click the desired layout name (e.g., <code>us</code> or <code>ara</code>).</li>
+                <li>**General:** Remember Geometry, Always on Top, Sticky (Not Functional), Middle-click Hide, Auto-Show, Frameless Window.</li>
+                <li>**Appearance:** Font, Button Text Color, Use System Theme Colors (overrides custom backgrounds/style), Custom Window/Button Background Colors, Background Opacity, Custom Button Style (disabled if using system colors).</li>
+                 <li>**Typing:** Auto-Repeat options.</li>
+                 <li>**Help:** View help guides.</li>
             </ul>
         </li>
         <li>
-            <strong>Minimizing / Hiding:</strong>
-            <ul>
-                <li>Click the standard close button (<code>X</code>) if the window has a frame. It hides to the system tray if available, otherwise quits.</li>
-                 <li>Click the custom <code>_</code> button (if frameless). Hides to tray if available, otherwise hides.</li>
-                 <li>If enabled in Settings, <strong>middle-click</strong> (mouse wheel click) anywhere on the keyboard's background area (not a button) to hide it to the tray/minimize/hide.</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Showing from Tray:</strong>
-            <ul>
-                 <li><strong>Left-click</strong> the keyboard icon in the system tray.</li>
-                 <li>Alternatively, <strong>right-click</strong> the keyboard icon and select "<strong>Show Keyboard</strong>".</li>
-            </ul>
-        </li>
-        <li>
-             <strong>Moving the Keyboard:</strong> Click anywhere on the virtual keyboard's main background area (not on a button) with the **left mouse button** and drag it.
-        </li>
-         <li>
-            <strong>Settings:</strong> Click the <strong><code>Set</code></strong> button to open the Settings & Help window. Configure options like:
-            <ul>
-                <li>**General Tab:** Remember Geometry, Always on Top, Sticky (Not Functional), Middle-click Hide, Auto-Show, Frameless Window.</li>
-                <li>**Appearance Tab:** Font, Button Text Color, Use System Theme Colors (overrides custom backgrounds/styles below), Custom Window/Button Background Colors, Background Opacity, Custom Button Style (ignored if using system colors).</li>
-                 <li>**Typing Tab:** Enable/disable Auto-Repeat, configure Delay and Interval.</li>
-                 <li>**Help Tabs:** View help guides (English and Arabic).</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Quitting the Application:</strong>
-             <ul>
-                 <li>Click the custom <code>X</code> button (if frameless).</li>
-                 <li><strong>Right-click</strong> the keyboard icon in the system tray and select "<strong>Quit</strong>".</li>
-                 <li>Close the window via the standard close button if it's framed and no system tray is available.</li>
-            </ul>
+            <strong>Quitting:</strong> Use the custom `X` button (if frameless), the tray menu, or the standard window close button (if framed and no tray).
         </li>
     </ol>
 
     <div class="note">
         <h2>Troubleshooting Notes:</h2>
         <ul>
-            <li><strong>Typing doesn't work or types wrong characters:</strong>
-                <ul>
-                    <li>Usually means XTEST simulation is disabled or not working (e.g., Wayland session, missing `python-xlib`). Check the "About" window (click <code>About</code>) for XTEST status.</li>
-                    <li>**Important:** If wrong characters are typed (e.g., pressing `ذ` types `ع` in Arabic), it often means the system's active layout (`setxkbmap`) doesn't match what the virtual keyboard expects for that key *code*. Ensure your system layout settings are correct and match one of the layouts the virtual keyboard visually supports (like standard `us` or `ara`).</li>
-                 </ul>
-            </li>
-            <li><strong>Language switching doesn't work:</strong>
-                <ul>
-                    <li>Might mean <code>XKB_Switcher.py</code> is missing, <code>setxkbmap</code> command failed, or permissions issues. "About" window shows XKB status.</li>
-                    <li>You might still see the layout change visually on the virtual keyboard, but the system setting won't change.</li>
-                 </ul>
-            </li>
-            <li><strong>Only one language available:</strong> If you can't switch, you likely only have one layout configured in your OS settings (e.g., only 'us'). Add more via system settings.</li>
-            <li><strong>Tray icon missing:</strong> Some Linux desktops might lack system tray support or require configuration.</li>
-            <li><strong>Middle-click hide doesn't work:</strong> Ensure the option "Minimize window on middle mouse click" is checked in the Settings window (General tab).</li>
-            <li><strong>Auto-Show doesn't work:</strong>
-                <ul>
-                    <li>Ensure the option "Auto-show keyboard..." is checked in Settings (General tab).</li>
-                    <li>Verify that AT-SPI accessibility services are running on your system (check your desktop environment's accessibility settings). You might need to install packages like `at-spi2-core`, `python3-gi`, `gir1.2-atspi-2.0`.</li>
-                    <li>Check the "About" window for the AT-SPI status (N/A, Active, Inactive). "N/A" or errors during startup usually indicate missing dependencies (`focus_monitor.py` or its requirements).</li>
-                    <li>This feature might be less reliable on Wayland sessions compared to X11/Xorg.</li>
-                </ul>
-            </li>
+            <li><strong>Typing doesn't work / wrong characters typed:</strong> Check XTEST status in "About". Ensure `python-xlib` is installed and you are on X11/Xorg. Wrong characters often mean the *system's* active keyboard layout doesn't match the keyboard's visual expectation (e.g., system is AZERTY, keyboard shows QWERTY). Ensure system layout matches visually supported ones (like `us`, `ar`, etc.) or add/edit corresponding JSON files in the `layouts` directory.</li>
+             <li><strong>Correct language characters not displayed on keys:</strong> Make sure a layout file corresponding to your system's layout code (e.g., `ara.json` for `ara`, `fr.json` for `fr`) exists in the `layouts` subdirectory within the application's installation path (`/usr/lib/python*/site-packages/pyxkeyboard/layouts/`). Check startup logs for loading errors.</li>
+            <li><strong>Language switching doesn't work:</strong> Check XKB status in "About". Ensure `xkb-switch` (preferred) or `setxkbmap` (fallback) is installed. Multiple layouts must be configured in your OS settings.</li>
+            <li><strong>Tray icon missing:</strong> System tray support might be missing or need configuration on some desktops.</li>
+            <li><strong>Middle-click hide doesn't work:</strong> Ensure option is checked in Settings -> General.</li>
+            <li><strong>Auto-Show doesn't work:</strong> Ensure option is checked. Verify AT-SPI dependencies (`python3-gi`, `gir1.2-atspi-2.0`) are installed and **Accessibility Services (AT-SPI Bus) are running**. Check AT-SPI status in "About". Less reliable on Wayland.</li>
             <li><strong>Window doesn't stay on top:</strong> Ensure "Always on Top" is checked in Settings. Feature depends on Window Manager support.</li>
             <li><strong>"Sticky" option doesn't work:</strong> This feature is currently not functional.</li>
-             <li><strong>Appearance issues (Transparency/Colors):</strong> Background opacity and custom colors might look different or have artifacts depending on your Window Manager and whether a compositor is running (especially with framed windows). Using system theme colors is generally more reliable.</li>
-             <li>**Application icon is generic:** After installing the DEB package, run `sudo gtk-update-icon-cache /usr/share/icons/hicolor/` and then log out and log back in.</li>
+             <li><strong>Appearance issues (Transparency/Colors):</strong> Background opacity might look different or have artifacts depending on your Window Manager and compositor. If "Use system theme colors" is checked, ensure your chosen "Button Text Color" has good contrast with your theme.</li>
+             <li>**Application icon is generic:** After installing the DEB/RPM package, run `sudo gtk-update-icon-cache /usr/share/icons/hicolor/ && sudo update-desktop-database` and then log out and log back in.</li>
+            <li>**Settings not saved/loaded correctly:** Ensure the directory `~/.pyxkeyboard` exists and your user has write permissions. Delete the `settings.json` file inside it to reset to defaults if needed.</li>
         </ul>
     </div>
 
-    <!-- NEW: About Section -->
+    <!-- About Section -->
     <div class="about-section">
         <h2>About Python XKeyboard</h2>
-        <p>Version: 1.0.2</p> <!-- Added version -->
+        <p>Version: 1.0.5</p>
         <p>Developed by: Khaled Abdelhamid<br>
         Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
-
-        <p><strong>License:</strong><br>
-        This program is distributed under the terms of the GNU General Public License version 3 (GPLv3).</p>
-
-        <p><strong>Disclaimer:</strong><br>
-        This software is provided 'as is' without warranty of any kind, express or implied. Use at your own risk.</p>
-
-        <p>If you find this program useful, please consider supporting its development via PayPal:<br>
-        <a href="https://paypal.me/kh1512">https://paypal.me/kh1512</a><br>
-        (Link for copying: <code>paypal.me/kh1512</code>)</p>
-
+        <p><strong>License:</strong> GPLv3</p>
+        <p><strong>Disclaimer:</strong> Provided 'as is'. Use at your own risk.</p>
+        <p>Support development via PayPal: <a href="https://paypal.me/kh1512">paypal.me/kh1512</a><br>
+        (Copy: <code>paypal.me/kh1512</code>)</p>
         <p>Thank you!</p>
     </div>
-    <!-- End NEW Section -->
-
+    <!-- End About Section -->
 
     <p style="text-align:center; margin-top: 30px; font-size: 0.9em; color: var(--subtle-text);">
         Enjoy using Python XKeyboard!

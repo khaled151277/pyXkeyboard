@@ -1,20 +1,25 @@
 # -*- coding: utf-8 -*-
 # file:virtual_keyboard_gui.py
-# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# PyXKeyboard v1.0.5 - A simple, customizable on-screen virtual keyboard.
 # Features include X11 key simulation (XTEST), system layout switching (XKB),
 # visual layout updates, configurable appearance (fonts, colors, opacity, styles),
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.
 # Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Contains the main VirtualKeyboard class, UI, event handling, and integration logic.
-# --- تم التعديل لإصلاح مشكلة زر ميتا (Win/Super) وزر القائمة (App) ---
+# --- Modified to load layout definitions from JSON files ---
+# --- Fixed missing update_tray_menu_check_state ---
+# --- Fixed Win/App key handling ---
+# --- Refactored update_key_labels for correct Shift/Caps state & layout loading ---
+# --- Reverted automatic text color selection for system themes ---
 
 import sys
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import re
 import copy
 import webbrowser
 from pathlib import Path # Required for file URI in About dialog
+import json # Required for loading layout files
 
 try:
     # Import necessary PyQt6 modules
@@ -22,7 +27,7 @@ try:
         QApplication, QMainWindow, QWidget, QPushButton, QGridLayout, QSizePolicy,
         QSystemTrayIcon, QMenu, QMessageBox
     )
-    from PyQt6.QtCore import Qt, QSize, QEvent, QPoint, QTimer, pyqtSignal, QRect
+    from PyQt6.QtCore import Qt, QSize, QEvent, QPoint, QTimer, pyqtSignal, QRect, QMetaObject, pyqtSlot
     from PyQt6.QtGui import (
         QFont, QPalette, QColor, QIcon, QAction,
         QPixmap, QPainter, QFontMetrics, QScreen,
@@ -37,20 +42,18 @@ except ImportError:
 # --- Local Project Imports (Relative Imports) ---
 from .settings_manager import load_settings, save_settings, DEFAULT_SETTINGS
 from .settings_dialog import SettingsDialog
-from .key_definitions import KEYBOARD_LAYOUT, KEY_CHAR_MAP, X11_KEYSYM_MAP
+from .key_definitions import KEYBOARD_LAYOUT, X11_KEYSYM_MAP, FALLBACK_CHAR_MAP # Import Fallback Map
 from . import xlib_integration as xlib_int
-# --- تمت الإضافة: استيراد Xlib و X اذا لم يكن dummy ---
-if not xlib_int.is_dummy():
-    import Xlib # Import the real Xlib
-    from Xlib import X # Import X constants
-else:
-    Xlib = None # Define as None if dummy is used
-# --- نهاية الإضافة ---
 
-from .xlib_integration import X as X_CONST # Use alias for X KeyPress/Release constants
+if not xlib_int.is_dummy():
+    import Xlib
+    from Xlib import X
+else:
+    Xlib = None
+
+from .xlib_integration import X as X_CONST
 from .XKB_Switcher import XKBManager, XKBManagerError
 
-# --- Optional Focus Monitor Import (Relative Import) ---
 _focus_monitor_available = False
 try:
     from .focus_monitor import EditableFocusMonitor
@@ -63,126 +66,126 @@ except Exception as e:
     print(f"WARNING: Unexpected error importing EditableFocusMonitor: {e}")
     EditableFocusMonitor = None
 
-# --- Constants for defining resize edges ---
 EDGE_NONE = 0; EDGE_TOP = 1; EDGE_BOTTOM = 2; EDGE_LEFT = 4; EDGE_RIGHT = 8
 EDGE_TOP_LEFT = EDGE_TOP | EDGE_LEFT; EDGE_TOP_RIGHT = EDGE_TOP | EDGE_RIGHT
 EDGE_BOTTOM_LEFT = EDGE_BOTTOM | EDGE_LEFT; EDGE_BOTTOM_RIGHT = EDGE_BOTTOM | EDGE_RIGHT
 
 
-# --- Main Application Window ---
 class VirtualKeyboard(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Python XKeyboard")
-        self.settings = load_settings() # Load settings first
+        self.settings = load_settings()
 
-        # --- تحميل الإعدادات المتعلقة بالنافذة ---
         self.is_frameless = self.settings.get("frameless_window", DEFAULT_SETTINGS.get("frameless_window", False))
         self.always_on_top = self.settings.get("always_on_top", DEFAULT_SETTINGS.get("always_on_top", True))
         self.is_sticky = self.settings.get("sticky_on_all_workspaces", DEFAULT_SETTINGS.get("sticky_on_all_workspaces", False))
         self.use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
-        # --- نهاية تحميل الإعدادات ---
 
         self.app_font = QFont()
         self.load_initial_font_settings()
         xlib_int.initialize_xlib(); self.xlib_ok = xlib_int.is_xtest_ok(); self.is_xlib_dummy = xlib_int.is_dummy()
 
-        # --- إعداد علامات النافذة بناءً على الإعدادات ---
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        base_flags = Qt.WindowType.Window
-        base_flags |= Qt.WindowType.WindowDoesNotAcceptFocus # دائما لا تقبل التركيز
-
-        if self.always_on_top:
-            base_flags |= Qt.WindowType.WindowStaysOnTopHint
-            print("Window initialized with Always on Top hint.")
-        else:
-            print("Window initialized without Always on Top hint.")
-
-        if self.is_frameless:
-            base_flags |= Qt.WindowType.FramelessWindowHint
-            print("Window initialized as frameless.")
-        else:
-            # Framed window gets standard buttons
-            base_flags |= (Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.CustomizeWindowHint)
-            print("Window initialized with standard frame.")
+        base_flags = Qt.WindowType.Window | Qt.WindowType.WindowDoesNotAcceptFocus
+        if self.always_on_top: base_flags |= Qt.WindowType.WindowStaysOnTopHint
+        if self.is_frameless: base_flags |= Qt.WindowType.FramelessWindowHint
+        else: base_flags |= (Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.CustomizeWindowHint)
         self.setWindowFlags(base_flags)
-        # --- نهاية إعداد العلامات ---
 
 
         self.resizing = False; self.resize_edge = EDGE_NONE; self.resize_start_pos = None; self.resize_start_geom = None
         self.resize_margin = 4
         self.setMouseTracking(True)
-        self.buttons = {}; self.current_language = 'en'; self.shift_pressed = False; self.ctrl_pressed = False; self.alt_pressed = False; self.caps_lock_pressed = False
-        # --- *** تم التراجع عن إضافة win_pressed *** ---
-        # self.win_pressed = False # Track Super key state
-        # --- *** نهاية التراجع *** ---
+        self.buttons = {}; self.current_language = 'us';
+        self.shift_pressed = False; self.ctrl_pressed = False; self.alt_pressed = False; self.caps_lock_pressed = False
         self.drag_position = None; self.xkb_manager = None; self.tray_icon = None; self.icon = None; self.language_menu = None; self.language_actions = {}; self.lang_action_group = None
         self.focus_monitor = None; self.focus_monitor_available = _focus_monitor_available
         self.tray_menu = None
         self.monitor_was_running_for_context_menu = False
+        self.layout_check_timer = None
 
-        # --- تحميل الأيقونة من الملفات ---
+        self.loaded_layouts: Dict[str, Dict] = {}
+        self.layouts_dir = os.path.join(os.path.dirname(__file__), 'layouts')
+        self._load_layout_files()
+
         self.icon = self.load_app_icon()
 
-        # Auto-Repeat Variables and Timers
         self.repeating_key_name = None
-        self.initial_delay_timer = QTimer(self)
-        self.initial_delay_timer.setSingleShot(True)
-        self.initial_delay_timer.timeout.connect(self._trigger_initial_repeat)
-        self.auto_repeat_timer = QTimer(self)
-        self.auto_repeat_timer.timeout.connect(self._trigger_subsequent_repeat)
+        self.initial_delay_timer = QTimer(self); self.initial_delay_timer.setSingleShot(True); self.initial_delay_timer.timeout.connect(self._trigger_initial_repeat)
+        self.auto_repeat_timer = QTimer(self); self.auto_repeat_timer.timeout.connect(self._trigger_subsequent_repeat)
         self._update_repeat_timers_from_settings()
 
         self.init_xkb_manager()
         self.central_widget = QWidget(); self.central_widget.setObjectName("centralWidget"); self.central_widget.setMouseTracking(True); self.central_widget.setAutoFillBackground(True)
         self.setCentralWidget(self.central_widget); self.grid_layout = QGridLayout(self.central_widget); self.grid_layout.setSpacing(3); self.grid_layout.setContentsMargins(5, 5, 5, 5)
         self.init_focus_monitor()
-        self._apply_global_styles_and_font() # Apply styles *after* setting flags and central widget
+        self._apply_global_styles_and_font()
         self.init_ui()
 
-        # --- تعيين الأيقونة للنافذة وشريط النظام ---
-        if self.icon:
-            self.setWindowIcon(self.icon) # تعيين أيقونة النافذة
-        self.init_tray_icon(); # استدعاء لإنشاء/تحديث أيقونة شريط النظام (سيستخدم self.icon)
-        # --- نهاية التعيين ---
-
+        if self.icon: self.setWindowIcon(self.icon)
+        self.init_tray_icon()
         self.apply_initial_geometry()
-        self.layout_check_timer = QTimer(self); self.layout_check_timer.timeout.connect(self.check_system_layout);
-        if self.xkb_manager: self.layout_check_timer.start(1000)
 
-        # --- إزالة تطبيق حالة الالتصاق الأولية ---
+        initial_lang = self.xkb_manager.get_current_layout_name() if self.xkb_manager else None
+        if not initial_lang or (initial_lang not in self.loaded_layouts and initial_lang not in ['us', 'en']):
+             if 'us' in self.loaded_layouts: initial_lang = 'us'
+             elif 'en' in self.loaded_layouts: initial_lang = 'en'
+             elif self.loaded_layouts: initial_lang = next(iter(self.loaded_layouts))
+             else: initial_lang = 'us'
+        self.sync_vk_lang_with_system_slot(initial_lang)
+
+        # Sticky state removed
         # QTimer.singleShot(100, lambda: self._set_sticky_state(self.is_sticky))
 
-    # --- دالة تحميل الأيقونة من الملفات ---
+    def _load_layout_files(self):
+        """Loads .json layout files from the layouts directory."""
+        print(f"Loading layouts from: {self.layouts_dir}")
+        if not os.path.isdir(self.layouts_dir):
+            print(f"Warning: Layouts directory not found: {self.layouts_dir}")
+            return
+
+        self.loaded_layouts = {}
+        for filename in os.listdir(self.layouts_dir):
+            if filename.endswith(".json"):
+                layout_code = filename[:-5]
+                filepath = os.path.join(self.layouts_dir, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        layout_data = json.load(f)
+                        if isinstance(layout_data, dict):
+                            valid = True
+                            for k, v in layout_data.items():
+                                if not isinstance(k, str) or not isinstance(v, (list, tuple)) or not all(isinstance(char, str) for char in v):
+                                    print(f"  - Warning: Invalid data structure for key '{k}' in {filename}. Skipping file.", file=sys.stderr)
+                                    valid = False
+                                    break
+                            if valid:
+                                self.loaded_layouts[layout_code] = layout_data
+                                print(f"  - Loaded layout '{layout_code}' from {filename}")
+                        else:
+                            print(f"  - Warning: Invalid format in {filename} (not a dictionary). Skipping.", file=sys.stderr)
+                except json.JSONDecodeError as e:
+                    print(f"  - Error decoding JSON in {filename}: {e}. Skipping.", file=sys.stderr)
+                except IOError as e:
+                    print(f"  - Error reading file {filename}: {e}. Skipping.", file=sys.stderr)
+                except Exception as e:
+                    print(f"  - Unexpected error loading {filename}: {e}. Skipping.", file=sys.stderr)
+
     def load_app_icon(self) -> Optional[QIcon]:
-        """ Loads the application icon from predefined PNG files. """
         icon = QIcon()
         script_dir = os.path.dirname(os.path.abspath(__file__))
         icon_dir = os.path.join(script_dir, 'icons')
         icon_files = [
-            os.path.join(icon_dir, "icon_32.png"),
-            os.path.join(icon_dir, "icon_64.png"),
-            os.path.join(icon_dir, "icon_128.png"),
-            os.path.join(icon_dir, "icon_256.png"),
+            os.path.join(icon_dir, "icon_32.png"), os.path.join(icon_dir, "icon_64.png"),
+            os.path.join(icon_dir, "icon_128.png"), os.path.join(icon_dir, "icon_256.png"),
         ]
-
         found_any = False
         for file_path in icon_files:
-            if os.path.exists(file_path):
-                 icon.addFile(file_path)
-                 found_any = True
-            else:
-                 print(f"Icon loader: File not found '{os.path.basename(file_path)}'")
+            if os.path.exists(file_path): icon.addFile(file_path); found_any = True
+        if found_any: print("Icon loaded successfully."); return icon
+        else: print("No icon files found. Generating default."); return self.generate_keyboard_icon()
 
-        if found_any:
-            print("Icon loaded successfully from files.")
-            return icon
-        else:
-            print("No icon files found. Generating default icon.")
-            return self.generate_keyboard_icon()
-    # --- نهاية دالة تحميل الأيقونة ---
-
-    # --- الدالة البديلة لتوليد أيقونة ---
     def generate_keyboard_icon(self, size=32):
         pixmap = QPixmap(size, size); pixmap.fill(Qt.GlobalColor.transparent); painter = QPainter(pixmap); painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         body_color = QColor("#ADD8E6"); border_color = QColor("#607B8B"); key_color = QColor("#404040")
@@ -195,7 +198,6 @@ class VirtualKeyboard(QMainWindow):
             for c in range(3): key_x = base_x_f + c * (key_width_f + key_h_spacing_f); key_y = base_y_f + r * (key_height_f + key_v_spacing_f); painter.drawRect(int(key_x), int(key_y), int(key_width_f), int(key_height_f))
         space_y = base_y_f + 2 * (key_height_f + key_v_spacing_f); space_width = key_width_f * 2 + key_h_spacing_f; painter.drawRect(int(base_x_f), int(space_y), int(space_width), int(key_height_f))
         painter.end(); return QIcon(pixmap)
-    # --- نهاية الدالة البديلة ---
 
     def _update_repeat_timers_from_settings(self):
         delay_ms = self.settings.get("auto_repeat_delay_ms", DEFAULT_SETTINGS.get("auto_repeat_delay_ms", 1500))
@@ -215,7 +217,6 @@ class VirtualKeyboard(QMainWindow):
         initial_geom_applied = False; min_width, min_height = 400, 130
         if self.settings.get("remember_geometry", DEFAULT_SETTINGS.get("remember_geometry", True)):
             geom = self.settings.get("window_geometry")
-            # --- Handle potential invalid geometry ---
             if geom and isinstance(geom, dict) and all(k in geom for k in ["x", "y", "width", "height"]):
                 try:
                     width = max(min_width, geom["width"]); height = max(min_height, geom["height"]); print(f"Applying saved geometry: x={geom['x']}, y={geom['y']}, w={width}, h={height}")
@@ -223,21 +224,39 @@ class VirtualKeyboard(QMainWindow):
                 except Exception as e: print(f"ERROR applying saved geometry: {e}."); self.settings["window_geometry"] = None
             else:
                  print("Ignoring invalid saved geometry.")
-                 self.settings["window_geometry"] = None # Clear invalid entry
+                 self.settings["window_geometry"] = None
         if not initial_geom_applied: print("Applying default geometry."); self.resize(900, 180); self.center_window()
         self.setMinimumSize(min_width, min_height)
 
     def init_xkb_manager(self):
-        if XKBManager:
-            try:
-                self.xkb_manager = XKBManager(auto_refresh=False)
-                if self.xkb_manager.refresh():
-                     initial_layout = self.xkb_manager.query_current_layout_name()
-                     if initial_layout: self.xkb_manager.set_layout_by_name(initial_layout, update_system=False)
-                     print(f"XKBManager Initialized: SUCCESS (Layouts: {self.xkb_manager.get_available_layouts()})")
-                else: print("XKBManager Initialized: ERROR - Initial refresh failed."); self.xkb_manager = None
-            except (XKBManagerError, Exception) as e: print(f"XKBManager Initialized: ERROR - {e}"); self.xkb_manager = None
-        else: print("XKBManager Initialized: Module not found."); self.current_language = 'en'
+        """Initializes the XKBManager and starts monitoring or timer."""
+        self.xkb_manager = None
+        if self.layout_check_timer and self.layout_check_timer.isActive():
+            self.layout_check_timer.stop()
+        self.layout_check_timer = None
+
+        try:
+            self.xkb_manager = XKBManager(auto_refresh=True, start_monitoring=False)
+
+            if self.xkb_manager and self.xkb_manager.get_current_method() != XKBManager.METHOD_NONE:
+                self.xkb_manager.layoutChanged.connect(self.sync_vk_lang_with_system_slot, Qt.ConnectionType.QueuedConnection)
+
+                if self.xkb_manager.can_monitor():
+                    print("Starting xkb-switch monitoring...")
+                    self.xkb_manager.start_change_monitor()
+                else:
+                    print("xkb-switch not available or failed, starting fallback timer...")
+                    self.layout_check_timer = QTimer(self)
+                    self.layout_check_timer.timeout.connect(self.check_system_layout_timer_slot)
+                    self.layout_check_timer.start(1000)
+            else:
+                print("XKB Manager could not be initialized with any method.")
+                self.current_language = 'us' # Fallback language
+
+        except (XKBManagerError, Exception) as e:
+            print(f"XKBManager Initialization FAILED: {e}", file=sys.stderr)
+            self.xkb_manager = None
+            self.current_language = 'us'
 
     def init_focus_monitor(self):
         if not self.focus_monitor_available or not EditableFocusMonitor: print("Focus monitor skipped."); return
@@ -258,6 +277,7 @@ class VirtualKeyboard(QMainWindow):
     def show_normal_and_raise(self):
         if self.isHidden(): self.showNormal(); self.raise_()
 
+    # --- *** تعديل: إلغاء الحساب التلقائي للون النص *** ---
     def _apply_global_styles_and_font(self):
         if not self.central_widget: return
         use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
@@ -268,26 +288,15 @@ class VirtualKeyboard(QMainWindow):
         window_bg_color_setting = self.settings.get("window_background_color", DEFAULT_SETTINGS.get("window_background_color", "#F0F0F0"))
         button_bg_color_setting = self.settings.get("button_background_color", DEFAULT_SETTINGS.get("button_background_color", "#E1E1E1"))
 
-        # --- تحديد لون النص الأساسي ---
-        final_text_color = custom_text_color
-        if use_system_colors:
-            palette = self.palette()
-            button_color = palette.color(QPalette.ColorRole.Button)
-            brightness = button_color.value()
-            if brightness > 128:
-                final_text_color = "#000000"
-                print("System theme detected as light, using black text.")
-            else:
-                final_text_color = "#FFFFFF"
-                print("System theme detected as dark, using white text.")
-        else:
-             final_text_color = custom_text_color
-             print(f"Using custom text color: {final_text_color}")
+        # --- استخدام لون النص المحدد في الإعدادات دائمًا ---
+        final_text_color_str = custom_text_color
+        print(f"Applying text color: {final_text_color_str}")
+        # --- نهاية التعديل ---
 
 
         # --- بناء أنماط الأزرار الأساسية ---
         common_button_style_parts = [
-            f"color: {final_text_color};",
+            f"color: {final_text_color_str};", # Apply the chosen text color
             f"font-family: '{font_family}';",
             f"font-size: {font_size}pt;",
             "padding: 2px;"
@@ -302,35 +311,28 @@ class VirtualKeyboard(QMainWindow):
             if button_style_name == "flat":
                 button_specific_style_parts.extend([
                     f"background-color: {button_bg_color_setting};",
-                    "border: 1px solid #aaaaaa;",
-                    "border-radius: 3px;"
-                ])
+                    "border: 1px solid #aaaaaa;", "border-radius: 3px;" ])
             elif button_style_name == "gradient":
                 button_specific_style_parts.extend([
                     "border: 1px solid #bbbbbb;",
                     """background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #fefefe, stop: 1 #e0e0e0);""",
-                    "border-radius: 4px;"
-                ])
+                    "border-radius: 4px;" ])
             else: # "default" button style with custom colors
                 button_specific_style_parts.append(f"background-color: {button_bg_color_setting};")
                 button_specific_style_parts.append("border: 1px solid #C0C0C0;")
 
             base_button_style = " ".join(common_button_style_parts + button_specific_style_parts)
-            print(f"Applying custom button style: {button_style_name}")
-
         else:
             # --- استخدام ألوان وأنماط النظام ---
-            button_specific_style_parts = [] # No custom bg or borders
+            # Only apply common parts (font, padding, text color)
+            button_specific_style_parts = []
             base_button_style = " ".join(common_button_style_parts)
-            print("Applying system theme styles for buttons.")
 
 
         # --- Styles for special states/buttons ---
-        # --- *** تعديل: إزالة النمط الخاص بـ modifier_on لأنه لن يستخدم لمفاتيح Win/App *** ---
-        # toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;"
-        toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;" # Keep for Shift, Ctrl, Alt, Caps
+        toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;"
         custom_control_style = "font-weight: bold; font-size: 10pt;"
-        donate_style = "font-size: 10pt; font-weight: bold; background-color: yellow; color: black; border: 1px solid #A0A000;"
+        donate_style = "font-size: 10pt; font-weight: bold; background-color: yellow; color: black !important; border: 1px solid #A0A000;" # Force black color for donate
 
         # --- تطبيق خلفية النافذة ---
         alpha_value = int(max(0.0, min(1.0, opacity_level)) * 255)
@@ -340,28 +342,33 @@ class VirtualKeyboard(QMainWindow):
             try:
                 base_window_color = QColor(window_bg_color_setting)
                 final_window_bg_rgba = f"rgba({base_window_color.red()}, {base_window_color.green()}, {base_window_color.blue()}, {alpha_value})"
-                print(f"Applying custom window background: {window_bg_color_setting} with alpha {alpha_value}")
-            except Exception as e:
-                print(f"Error applying custom window background color '{window_bg_color_setting}': {e}")
+            except Exception as e: print(f"Error applying custom window background color '{window_bg_color_setting}': {e}")
         else:
              palette = self.palette()
              base_color = palette.color(QPalette.ColorRole.Window)
              final_window_bg_rgba = f"rgba({base_color.red()}, {base_color.green()}, {base_color.blue()}, {alpha_value})"
-             print(f"Applying system theme window background ({base_color.name()}) with alpha {alpha_value}")
 
         bg_style = f"background-color: {final_window_bg_rgba} !important;"
         self.central_widget.setStyleSheet(f"QWidget#centralWidget {{ {bg_style} }}")
 
         # --- تطبيق الأنماط النهائية ---
-        # --- *** تعديل: التأكد من أن النمط modifier_on يطبق فقط على المفاتيح التي تحتاجه *** ---
         full_stylesheet = f"""
             QPushButton {{ {base_button_style} }}
+            /* Text color is now included in base_button_style */
             QPushButton:pressed {{ background-color: #cceeff !important; border: 1px solid #88aabb !important; }}
             QPushButton[modifier_on="true"] {{ {toggled_modifier_style} }}
             QPushButton#MinimizeButton, QPushButton#CloseButton {{ {custom_control_style} }}
             QPushButton#DonateButton {{ {donate_style} }}
         """
         self.setStyleSheet(full_stylesheet)
+
+        # --- *** إزالة حلقة تطبيق QPalette *** ---
+        # if use_system_colors:
+        #     print(f"Applying text color explicitly via Palette: {final_text_color_str}")
+        #     final_text_qcolor = QColor(final_text_color_str)
+        #     for key_name, button in self.buttons.items():
+        #         # ... (palette code removed) ...
+    # --- *** نهاية التعديل *** ---
 
 
     def update_application_font(self, new_font): self.app_font = QFont(new_font)
@@ -371,7 +378,6 @@ class VirtualKeyboard(QMainWindow):
             color_str = DEFAULT_SETTINGS.get("text_color", "#000000")
         self.settings["text_color"] = color_str
 
-    # --- دوال تحديث الألوان الجديدة ---
     def update_window_background_color(self, color_str):
         if not (isinstance(color_str, str) and color_str.startswith('#') and (len(color_str) == 7 or len(color_str) == 9)):
             color_str = DEFAULT_SETTINGS.get("window_background_color", "#F0F0F0")
@@ -381,7 +387,6 @@ class VirtualKeyboard(QMainWindow):
         if not (isinstance(color_str, str) and color_str.startswith('#') and (len(color_str) == 7 or len(color_str) == 9)):
             color_str = DEFAULT_SETTINGS.get("button_background_color", "#E1E1E1")
         self.settings["button_background_color"] = color_str
-    # --- نهاية الدوال الجديدة ---
 
     def update_application_button_style(self, style_name):
         valid_styles = ["default", "flat", "gradient"];
@@ -405,22 +410,16 @@ class VirtualKeyboard(QMainWindow):
     def init_ui(self):
         symbol_map = { "Caps Lock": "⇪ Caps", "Tab": "⇥ Tab", "Enter": "↵ Enter", "Backspace": "⌫ Bksp", "Up": "↑", "Down": "↓", "Left": "←", "Right": "→", "L Win": "◆", "R Win": "◆", "App": "☰", "Scroll Lock": "Scroll Lk", "Pause": "Pause", "PrtSc":"PrtSc", "Insert":"Ins", "Home":"Home", "Page Up":"PgUp", "Delete":"Del", "End":"End", "Page Down":"PgDn", "L Ctrl":"Ctrl", "R Ctrl":"Ctrl", "L Alt":"Alt", "R Alt":"AltGr", "Space":"Space", "Esc":"Esc", "About":"About", "Set":"Set", "LShift": "⇧ Shift", "RShift": "⇧ Shift", "Minimize":"_", "Close":"X", "Donate":"Donate"}
         self.buttons = {}
-        # Clear previous layout
         while self.grid_layout.count():
              item = self.grid_layout.takeAt(0)
-             if item is not None:
-                 widget = item.widget()
-                 if widget: widget.deleteLater()
+             if item is not None: widget = item.widget();
+             if widget: widget.deleteLater()
 
-        # Define keys that should support auto-repeat
-        repeatable_keys = set(KEY_CHAR_MAP.keys()) | {'Space', 'Backspace', 'Delete', 'Tab', 'Enter', 'Up', 'Down', 'Left', 'Right'}
-        # --- *** تعديل: إضافة Win و App إلى المفاتيح غير المتكررة *** ---
+        repeatable_keys = set(FALLBACK_CHAR_MAP.keys()) | {'Space', 'Backspace', 'Delete', 'Tab', 'Enter', 'Up', 'Down', 'Left', 'Right'}
         non_repeatable_functional_keys = {'Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
                                            'PrtSc', 'Scroll Lock', 'Pause', 'Insert', 'Home', 'Page Up', 'End', 'Page Down',
-                                           'L Win', 'R Win', 'App'} # Added Win and App here
-        # --- *** تعديل: إزالة Win من مفاتيح التعديل *** ---
-        modifier_keys = {'LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'} # Removed Win keys
-        # --- *** نهاية التعديل *** ---
+                                           'L Win', 'R Win', 'App'}
+        modifier_keys = {'LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'}
         special_action_keys = {'About', 'Set', 'Minimize', 'Close', 'Donate', 'Lang'}
 
         for r, row_keys in enumerate(KEYBOARD_LAYOUT):
@@ -435,50 +434,38 @@ class VirtualKeyboard(QMainWindow):
                     button = QPushButton(initial_label)
                     button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                     button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-                    button.setAutoRepeat(False) # We handle our own repeat
+                    button.setAutoRepeat(False)
 
-                    # --- تحديد سلوك الزر ---
                     if key_name in special_action_keys:
                         if key_name == 'Lang': button.clicked.connect(self.toggle_language)
                         elif key_name == 'About': button.clicked.connect(self.show_about_message)
                         elif key_name == 'Set': button.clicked.connect(self.open_settings_dialog)
                         elif key_name == 'Minimize': button.clicked.connect(self.hide_to_tray); button.setObjectName("MinimizeButton")
                         elif key_name == 'Close': button.clicked.connect(self.quit_application); button.setObjectName("CloseButton")
-                        elif key_name == 'Donate': button.clicked.connect(self._open_donate_link); button.setObjectName("DonateButton") # Set object name here
+                        elif key_name == 'Donate': button.clicked.connect(self._open_donate_link); button.setObjectName("DonateButton")
                     elif key_name in modifier_keys:
-                        # Modifier keys (Shift, Ctrl, Alt, Caps) still toggle state
                         button.setProperty("modifier_on", False)
                         button.clicked.connect(lambda chk=False, k=key_name: self.on_modifier_key_press(k))
-                    elif key_name in repeatable_keys: # مفاتيح قابلة للتكرار (بما فيها الأسهم)
+                    elif key_name in repeatable_keys:
                         button.pressed.connect(lambda k=key_name: self._handle_key_pressed(k))
                         button.released.connect(lambda k=key_name: self._handle_key_released(k))
-                        # السماح بالنقر الأيمن (Shift+Key) للمفاتيح القابلة للكتابة فقط (وليس الأسهم)
-                        if key_name in KEY_CHAR_MAP:
+                        if key_name in FALLBACK_CHAR_MAP:
                             button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
                             button.customContextMenuRequested.connect(lambda pos, k=key_name: self.on_typable_key_right_press(k))
-                    # --- *** تعديل: Win و App يتصلان بـ on_non_repeatable_key_press *** ---
                     elif key_name in non_repeatable_functional_keys:
-                        # Includes Esc, F-keys, AND L Win, R Win, App now
                         button.clicked.connect(lambda chk=False, k=key_name: self.on_non_repeatable_key_press(k))
-                    # --- *** نهاية التعديل *** ---
                     else:
                         print(f"Warning: Key '{key_name}' has no defined action.")
-                    # --- نهاية تحديد السلوك ---
 
                     self.grid_layout.addWidget(button, r, col, row_span, col_span)
                     self.buttons[key_name] = button
-                    # إظهار/إخفاء الأزرار المخصصة بناءً على حالة الإطار
                     if key_name in ['Minimize', 'Close']:
                          button.setVisible(self.is_frameless)
 
                     col += col_span
                 else:
-                    # Handle None placeholder for spacing
                     col += 1
-        # Initial language sync
-        if self.xkb_manager: self.sync_vk_lang_with_system(initial_setup=True)
-        else: self.update_key_labels()
-
+        # Initial sync is now handled in __init__
 
     def _open_donate_link(self):
         url = "https://paypal.me/kh1512"; print(f"Opening donation link: {url}")
@@ -490,17 +477,11 @@ class VirtualKeyboard(QMainWindow):
             self.hide()
             try:
                  self.tray_icon.showMessage(self.windowTitle(), "Minimized to system tray.", self.icon if self.icon else QIcon(), 2000)
-            except Exception as e:
-                 print(f"Tray message failed: {e}")
-        elif not self.is_frameless:
-            print("No tray, minimizing.")
-            self.showMinimized()
-        else:
-            print("No tray and frameless, hiding window.")
-            self.hide()
+            except Exception as e: print(f"Tray message failed: {e}")
+        elif not self.is_frameless: print("No tray, minimizing."); self.showMinimized()
+        else: print("No tray and frameless, hiding window."); self.hide()
 
     def init_tray_icon(self):
-        """ Initializes or updates the system tray icon and its context menu. """
         if not QSystemTrayIcon.isSystemTrayAvailable():
             if self.tray_icon: self.tray_icon.hide(); self.tray_icon = None
             self.tray_menu = None; print("System Tray not available."); return
@@ -547,7 +528,6 @@ class VirtualKeyboard(QMainWindow):
         if not self.xlib_ok: tooltip_parts.append("Input ERR")
         if self.settings.get("auto_show_on_edit", DEFAULT_SETTINGS.get("auto_show_on_edit", False)): tooltip_parts.append("AutoShow ON")
         if self.always_on_top: tooltip_parts.append("Always On Top")
-        # if self.is_sticky: tooltip_parts.append("Sticky")
         try: self.tray_icon.setToolTip("\n".join(tooltip_parts))
         except Exception as e: print(f"Tray tooltip error: {e}")
         self.update_tray_menu_check_state()
@@ -568,9 +548,12 @@ class VirtualKeyboard(QMainWindow):
 
     def quit_application(self):
         print("Quit requested...")
-        if hasattr(self, 'layout_check_timer'): self.layout_check_timer.stop()
-        self.initial_delay_timer.stop()
-        self.auto_repeat_timer.stop()
+        if self.xkb_manager and self.xkb_manager.can_monitor():
+            self.xkb_manager.stop_change_monitor()
+        elif self.layout_check_timer and self.layout_check_timer.isActive():
+            self.layout_check_timer.stop()
+        if hasattr(self, 'initial_delay_timer'): self.initial_delay_timer.stop()
+        if hasattr(self, 'auto_repeat_timer'): self.auto_repeat_timer.stop()
         if self.focus_monitor and self.focus_monitor.is_running():
             try: self.focus_monitor.stop()
             except Exception as e: print(f"Error stopping focus monitor: {e}")
@@ -594,8 +577,9 @@ class VirtualKeyboard(QMainWindow):
             except Exception as e: print(f"ERROR stopping focus monitor: {e}")
         try:
             status_xkb="N/A"; status_xtest="N/A"; status_auto_show="N/A"
+            xkb_method = f" ({self.xkb_manager.get_current_method()})" if self.xkb_manager else ""
             if XKBManager is None: status_xkb = "Disabled (XKB_Switcher missing)"
-            elif self.xkb_manager: status_xkb = f"Enabled (Layouts: {', '.join(self.xkb_manager.get_available_layouts() or ['N/A'])})"
+            elif self.xkb_manager: status_xkb = f"Enabled{xkb_method} (Layouts: {', '.join(self.xkb_manager.get_available_layouts() or ['N/A'])})"
             else: status_xkb = "Disabled (Init error)"
             if self.is_xlib_dummy: status_xtest = "Disabled (python-xlib missing)"
             elif self.xlib_ok: status_xtest = "Enabled"
@@ -624,7 +608,7 @@ class VirtualKeyboard(QMainWindow):
             main_info = f"""
              {badge_html}
              <div style="overflow: hidden;">
-             <p><b>{program_name} v1.0.3</b><br>A simple on-screen virtual keyboard.</p>
+             <p><b>{program_name} v1.0.5</b><br>A simple on-screen virtual keyboard.</p>
              <p>Developed by: Khaled Abdelhamid<br>Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
              <p><b>License:</b><br>GNU General Public License v3 (GPLv3)</p>
              <p><b>Disclaimer:</b><br>Provided 'as is'. Use at your own risk.</p>
@@ -649,7 +633,6 @@ class VirtualKeyboard(QMainWindow):
 
     def open_settings_dialog(self):
         settings_copy = copy.deepcopy(self.settings); dialog = SettingsDialog(settings_copy, self.app_font, self.focus_monitor_available, self)
-        # Connect the signal BEFORE showing the dialog
         dialog.settingsApplied.connect(self._apply_settings_from_dialog)
         monitor_was_running = False
         if self.focus_monitor and self.focus_monitor.is_running():
@@ -657,9 +640,8 @@ class VirtualKeyboard(QMainWindow):
             try: self.focus_monitor.stop(); monitor_was_running = True
             except Exception as e: print(f"ERROR stopping focus monitor: {e}")
         try:
-            dialog.exec() # Show the dialog modally
+            dialog.exec()
         finally:
-            # Resume monitor logic (runs after dialog is closed, regardless of OK/Cancel)
             setting_is_enabled_after_dialog = self.settings.get("auto_show_on_edit", DEFAULT_SETTINGS.get("auto_show_on_edit", False))
             if monitor_was_running and setting_is_enabled_after_dialog:
                 print("Resuming focus monitor after Settings dialog...")
@@ -674,84 +656,50 @@ class VirtualKeyboard(QMainWindow):
                 if self.focus_monitor and self.focus_monitor.is_running():
                      try: self.focus_monitor.stop()
                      except Exception as e: print(f"ERROR stopping disabled focus monitor: {e}")
-
-            # Refresh tray (might need updated tooltip based on settings)
             self.init_tray_icon()
-
-            # Disconnect signal AFTER the dialog is closed and settings (potentially) applied
             try: dialog.settingsApplied.disconnect(self._apply_settings_from_dialog)
-            except (TypeError, RuntimeError): pass # Ignore if already disconnected or failed
+            except (TypeError, RuntimeError): pass
 
-    # --- دالة لتغيير حالة الالتصاق (تبقى موجودة ولكن لا يتم استدعاؤها) ---
     def _set_sticky_state(self, sticky: bool):
         """Sets the window's sticky state using Xlib EWMH hints."""
-        if self.is_xlib_dummy or not Xlib:
-            # print("Sticky state: Skipped (Xlib dummy or not imported)") # Commented out
-            return
+        if self.is_xlib_dummy or not Xlib: return
         display = xlib_int.get_display()
-        if not display:
-            # print("Sticky state: Skipped (No X display)") # Commented out
-            return
-
+        if not display: return
         try:
             win_id = self.winId()
-            if not win_id:
-                 QTimer.singleShot(200, lambda: self._set_sticky_state(sticky))
-                 # print("Sticky state: winId not ready, retrying shortly...") # Commented out
-                 return
-
+            if not win_id: QTimer.singleShot(200, lambda: self._set_sticky_state(sticky)); return
             NET_WM_STATE = display.intern_atom('_NET_WM_STATE')
             NET_WM_STATE_STICKY = display.intern_atom('_NET_WM_STATE_STICKY')
-
-            if not NET_WM_STATE or not NET_WM_STATE_STICKY:
-                print("Sticky state: Failed (Could not get EWMH atoms. WM incompatible?)")
-                return
-
-            action = 1 if sticky else 0  # 1 = add state, 0 = remove state
+            if not NET_WM_STATE or not NET_WM_STATE_STICKY: print("Sticky state: Failed (EWMH atoms missing)"); return
+            action = 1 if sticky else 0
             data = [action, NET_WM_STATE_STICKY, 0, 1, 0]
-
             root = display.screen().root
-            event = Xlib.protocol.event.ClientMessage(
-                window=win_id,
-                client_type=NET_WM_STATE,
-                data=(32, data)
-            )
-
+            event = Xlib.protocol.event.ClientMessage(window=win_id, client_type=NET_WM_STATE, data=(32, data))
             mask = (X.SubstructureRedirectMask | X.SubstructureNotifyMask)
             root.send_event(event, event_mask=mask)
             display.flush()
-            # print(f"Sticky state: {'Enabled' if sticky else 'Disabled'} (EWMH message sent for window {win_id})") # Commented out
-
         except Exception as e:
             print(f"Sticky state: ERROR applying - {e}", file=sys.stderr)
             try:
                 if display: display.flush()
             except: pass
-    # --- نهاية الدالة ---
-
 
     def _apply_settings_from_dialog(self, applied_settings):
         """Applies settings received from the settings dialog."""
         print("Applying settings from dialog...");
         previous_frameless = self.is_frameless
         previous_on_top = self.always_on_top
-        # previous_sticky = self.is_sticky # لم نعد بحاجة لهذا
 
-        # Update the main settings dictionary *first*
         self.settings = copy.deepcopy(applied_settings)
 
-        # Update internal state variables based on new settings
         self.is_frameless = self.settings.get("frameless_window", DEFAULT_SETTINGS.get("frameless_window", False))
         self.always_on_top = self.settings.get("always_on_top", DEFAULT_SETTINGS.get("always_on_top", True))
         self.is_sticky = self.settings.get("sticky_on_all_workspaces", DEFAULT_SETTINGS.get("sticky_on_all_workspaces", False))
-        self.use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False)) # تحديث حالة استخدام ألوان النظام
+        self.use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
 
-        # --- استدعاء دوال التحديث للألوان الجديدة ---
         self.update_window_background_color(self.settings.get("window_background_color", DEFAULT_SETTINGS.get("window_background_color", "#F0F0F0")))
         self.update_button_background_color(self.settings.get("button_background_color", DEFAULT_SETTINGS.get("button_background_color", "#E1E1E1")))
-        # --- نهاية الاستدعاء ---
 
-        # Apply other visual settings that don't require window recreation
         new_font = QFont(self.settings.get("font_family", DEFAULT_SETTINGS.get("font_family", "Sans Serif")),
                          self.settings.get("font_size", DEFAULT_SETTINGS.get("font_size", 9)))
         if new_font != self.app_font:
@@ -762,52 +710,31 @@ class VirtualKeyboard(QMainWindow):
         self.update_application_button_style(self.settings.get("button_style", DEFAULT_SETTINGS.get("button_style", "default")))
         self._update_repeat_timers_from_settings()
 
-        # Check if window flags need changing
         flags_changed = (self.is_frameless != previous_frameless or self.always_on_top != previous_on_top)
 
         if flags_changed:
             print("Window flags changed, re-applying...")
-            # Construct the new flags
-            base_flags = Qt.WindowType.Window
-            base_flags |= Qt.WindowType.WindowDoesNotAcceptFocus
-
-            if self.always_on_top:
-                base_flags |= Qt.WindowType.WindowStaysOnTopHint
-            if self.is_frameless:
-                base_flags |= Qt.WindowType.FramelessWindowHint
-            else:
-                base_flags |= (Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.CustomizeWindowHint)
+            base_flags = Qt.WindowType.Window | Qt.WindowType.WindowDoesNotAcceptFocus
+            if self.always_on_top: base_flags |= Qt.WindowType.WindowStaysOnTopHint
+            if self.is_frameless: base_flags |= Qt.WindowType.FramelessWindowHint
+            else: base_flags |= (Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.CustomizeWindowHint)
 
             current_visibility = self.isVisible()
-            print("  Hiding window to apply flags...")
             self.hide()
-            print(f"  Setting flags: {base_flags}")
             self.setWindowFlags(base_flags)
-            print("  Flags set.")
-            # Reapply styles *after* setting flags but *before* showing
-            self._apply_global_styles_and_font()
-            # Re-initialize UI elements dependent on frameless state
+            self._apply_global_styles_and_font() # Apply styles AFTER flags
             for key_name in ['Minimize', 'Close']:
-                 if key_name in self.buttons:
-                      self.buttons[key_name].setVisible(self.is_frameless)
+                 if key_name in self.buttons: self.buttons[key_name].setVisible(self.is_frameless)
             print("Custom button visibility updated.")
-
-            if current_visibility:
-                print("  Re-showing window...")
-                QTimer.singleShot(50, self.show)
-            else:
-                 print("  Window was hidden, keeping hidden.")
-
+            if current_visibility: QTimer.singleShot(50, self.show)
+            else: print("Window was hidden, keeping hidden.")
         else:
-            # If flags didn't change, just reapply styles and update labels
-            self._apply_global_styles_and_font()
+            self._apply_global_styles_and_font() # Apply styles even if flags didn't change
             self.update_key_labels()
             print("Styles and labels updated (no flag change).")
 
-        # --- إزالة تطبيق الالتصاق من هنا ---
+        # Sticky state application removed
 
-
-        # Refresh tray icon (tooltip might change)
         self.init_tray_icon()
 
 
@@ -828,7 +755,7 @@ class VirtualKeyboard(QMainWindow):
         self.monitor_was_running_for_context_menu = False
 
     def _get_resize_edge(self, pos: QPoint) -> int:
-        if not self.is_frameless: return EDGE_NONE # لا تغيير الحجم إذا كانت النافذة بإطار
+        if not self.is_frameless: return EDGE_NONE
         rect = self.rect(); margin = self.resize_margin
         on_top = pos.y() < margin; on_bottom = pos.y() > rect.bottom() - margin
         on_left = pos.x() < margin; on_right = pos.x() > rect.right() - margin
@@ -841,23 +768,18 @@ class VirtualKeyboard(QMainWindow):
 
     def _update_cursor_shape(self, edge: int):
         cursor_shape = Qt.CursorShape.ArrowCursor
-        # لا تغيير شكل المؤشر إذا كانت النافذة بإطار (تعتمد على إطار النظام)
         if self.is_frameless:
             if edge == EDGE_TOP or edge == EDGE_BOTTOM: cursor_shape = Qt.CursorShape.SizeVerCursor
             elif edge == EDGE_LEFT or edge == EDGE_RIGHT: cursor_shape = Qt.CursorShape.SizeHorCursor
             elif edge == EDGE_TOP_LEFT or edge == EDGE_BOTTOM_RIGHT: cursor_shape = Qt.CursorShape.SizeFDiagCursor
             elif edge == EDGE_TOP_RIGHT or edge == EDGE_BOTTOM_LEFT: cursor_shape = Qt.CursorShape.SizeBDiagCursor
-
-        # تحديث المؤشر فقط إذا تغير
-        if self.cursor().shape() != cursor_shape:
-            self.setCursor(QCursor(cursor_shape))
+        if self.cursor().shape() != cursor_shape: self.setCursor(QCursor(cursor_shape))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.MiddleButton:
             if self.settings.get("auto_hide_on_middle_click", DEFAULT_SETTINGS.get("auto_hide_on_middle_click", True)):
                 self.hide_to_tray(); event.accept(); return
         elif event.button() == Qt.MouseButton.RightButton:
-            # --- إظهار قائمة السياق عند النقر بزر الماوس الأيمن على الخلفية ---
             target_widget = self.childAt(event.position().toPoint())
             is_background_click = (target_widget is self or target_widget is self.central_widget or target_widget is None)
             if self.tray_menu and is_background_click:
@@ -872,35 +794,22 @@ class VirtualKeyboard(QMainWindow):
                 self.tray_menu.popup(event.globalPosition().toPoint()); event.accept(); return
         elif event.button() == Qt.MouseButton.LeftButton:
             local_pos = event.position().toPoint()
-
-            # --- أولاً، تحقق من تغيير الحجم إذا كانت النافذة بدون إطار ---
             if self.is_frameless:
                 self.resize_edge = self._get_resize_edge(local_pos)
-                if self.resize_edge != EDGE_NONE: # Start resizing if frameless and on edge
+                if self.resize_edge != EDGE_NONE:
                     self.resizing = True; self.resize_start_pos = event.globalPosition().toPoint(); self.resize_start_geom = self.geometry()
                     self._update_cursor_shape(self.resize_edge); print(f"Start resize: {self.resize_edge}"); event.accept(); return
-
-            # --- إذا لم يكن تغيير الحجم، تحقق من بدء السحب (بغض النظر عن الإطار) ---
             target_widget = self.childAt(local_pos)
-            # التحقق من أن الضغط على الخلفية (وليس زر)
             is_button = isinstance(target_widget, QPushButton) if target_widget else False
             is_background_click = (target_widget is self.central_widget or target_widget is None or target_widget is self) and not is_button
-
             if is_background_click:
-                # --- بدء السحب بزر الماوس الأيسر على الخلفية دائمًا ---
                 self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft(); print("Start drag (Left Button)"); event.accept(); return
 
-        # --- إذا لم يتم التعامل مع الحدث، اسمح بالانتشار (مثل النقر على الأزرار) ---
-        # super().mousePressEvent(event)
-
     def mouseMoveEvent(self, event):
-        # --- التعامل مع خروج المؤشر من الزر أثناء التكرار (لا تغيير) ---
         if self.repeating_key_name and self.buttons.get(self.repeating_key_name):
              button = self.buttons[self.repeating_key_name]
              if not button.rect().contains(button.mapFromGlobal(event.globalPosition().toPoint())):
                   self._handle_key_released(self.repeating_key_name, force_stop=True)
-
-        # --- التعامل مع تغيير الحجم (لا تغيير، يعمل بزر الماوس الأيسر) ---
         if self.is_frameless and self.resizing and event.buttons() == Qt.MouseButton.LeftButton:
             current_pos = event.globalPosition().toPoint(); delta = current_pos - self.resize_start_pos; new_geom = QRect(self.resize_start_geom)
             if self.resize_edge & EDGE_TOP: new_geom.setTop(self.resize_start_geom.top() + delta.y())
@@ -915,163 +824,192 @@ class VirtualKeyboard(QMainWindow):
                 if self.resize_edge & EDGE_TOP: new_geom.setTop(new_geom.bottom() - min_h)
                 else: new_geom.setHeight(min_h)
             self.setGeometry(new_geom); event.accept(); return
-
-        # --- التعامل مع السحب (لا تغيير، يعمل بزر الماوس الأيسر) ---
         elif self.drag_position is not None and event.buttons() == Qt.MouseButton.LeftButton:
              new_pos = event.globalPosition().toPoint() - self.drag_position; self.move(new_pos); event.accept(); return
-
-        # --- تحديث شكل المؤشر عند الحواف (فقط إذا كانت النافذة بدون إطار) ---
         elif self.is_frameless and not self.resizing and self.drag_position is None:
              current_edge = self._get_resize_edge(event.position().toPoint()); self._update_cursor_shape(current_edge)
-
-        # --- اسمح بالانتشار إذا لم يتم التعامل مع الحدث ---
         if not (self.is_frameless and (self.resizing or self.drag_position is not None)):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        # --- إيقاف التكرار عند تحرير أي زر (لا تغيير) ---
         if self.repeating_key_name:
              self._handle_key_released(self.repeating_key_name, force_stop=True)
-
-        # --- إنهاء تغيير الحجم (لا تغيير، يعمل بزر الماوس الأيسر) ---
         if self.is_frameless and self.resizing and event.button() == Qt.MouseButton.LeftButton:
             self.resizing = False; self.resize_edge = EDGE_NONE; self.resize_start_pos = None; self.resize_start_geom = None; self.unsetCursor(); print("Resize finished"); event.accept(); return
-
-        # --- إنهاء السحب (لا تغيير، يعمل بزر الماوس الأيسر) ---
         elif self.drag_position is not None and event.button() == Qt.MouseButton.LeftButton:
             self.drag_position = None; print("Drag finished"); event.accept(); return
-
-        # --- إعادة تعيين المؤشر إذا لم يكن هناك أزرار مضغوطة (فقط إذا كانت بدون إطار) ---
         elif self.is_frameless and not self.resizing and not event.buttons():
             self.unsetCursor()
-
-        # --- اسمح بالانتشار إذا لم يتم التعامل مع الحدث ---
         if not (self.is_frameless and (self.resizing or self.drag_position is not None) and event.button() == Qt.MouseButton.LeftButton):
             super().mouseReleaseEvent(event)
 
-    def sync_vk_lang_with_system(self, initial_setup=False):
-        if not self.xkb_manager:
-            if initial_setup: self.update_key_labels(); return
-        current_sys_name = self.xkb_manager.query_current_layout_name(); new_vk_lang = self.current_language; manager_updated = False
+    @pyqtSlot(str)
+    def sync_vk_lang_with_system_slot(self, new_layout_name: Optional[str] = None):
+        """Slot to update the virtual keyboard when the layout changes."""
+        # print(f"Syncing VK layout (triggered by {'monitor signal' if new_layout_name else 'timer/manual'})...")
+        if not self.xkb_manager: return
+
+        current_sys_name = new_layout_name if new_layout_name is not None else self.xkb_manager.query_current_layout_name()
+
         if current_sys_name:
-            target_vk_lang = 'ar' if 'ar' in current_sys_name.lower() else 'en'; new_vk_lang = target_vk_lang
-            available_layouts = self.xkb_manager.get_available_layouts()
-            if current_sys_name in available_layouts:
-                try:
-                    sys_index = available_layouts.index(current_sys_name)
-                    if self.xkb_manager.get_current_layout_index() != sys_index:
-                        # print(f"Internal XKB update: {current_sys_name} ({sys_index})"); # Less verbose
-                        self.xkb_manager.set_layout_by_index(sys_index, update_system=False); manager_updated = True
-                except ValueError: pass
-            else: print(f"WARN: System layout '{current_sys_name}' not cached.")
-        if self.current_language != new_vk_lang or initial_setup:
-            print(f"Update visual layout: {self.current_language} -> {new_vk_lang}"); self.current_language = new_vk_lang; self.update_key_labels()
-        if manager_updated or initial_setup: self.update_tray_menu_check_state()
+            target_vk_lang = current_sys_name
+            layout_exists = target_vk_lang in self.loaded_layouts
+            if not layout_exists:
+                 if target_vk_lang.startswith('en') and 'us' in self.loaded_layouts: target_vk_lang = 'us'; layout_exists = True
+                 elif 'us' in self.loaded_layouts: target_vk_lang = 'us'; layout_exists = True
+                 elif self.loaded_layouts: target_vk_lang = next(iter(self.loaded_layouts)); layout_exists = True
+
+            if not layout_exists:
+                 print(f"Error: No suitable layout found for system layout '{current_sys_name}' and no fallbacks ('us', 'en'). Cannot update display.", file=sys.stderr)
+                 target_vk_lang = 'us' # Final fallback to 'us' to prevent errors
+
+            if self.current_language != target_vk_lang:
+                print(f"Update visual layout: {self.current_language} -> {target_vk_lang}")
+                self.current_language = target_vk_lang
+                self.update_key_labels()
+
+            if new_layout_name is None and self.xkb_manager.get_current_layout_name() != current_sys_name:
+                 if current_sys_name in self.xkb_manager.get_available_layouts():
+                     try:
+                         sys_index = self.xkb_manager.get_available_layouts().index(current_sys_name)
+                         self.xkb_manager._set_internal_index(sys_index, emit_signal=False)
+                     except ValueError: pass
+                 else:
+                     print(f"Sync Warning: Queried layout '{current_sys_name}' not in known system layouts.", file=sys.stderr)
+        else:
+            print("WARNING: Could not query current system layout during sync.")
+
+        self.update_tray_menu_check_state()
+
+    @pyqtSlot()
+    def check_system_layout_timer_slot(self):
+        """Called only by the QTimer to periodically check the system layout."""
+        if not self.xkb_manager or self.xkb_manager.can_monitor():
+             if self.layout_check_timer and self.layout_check_timer.isActive():
+                 self.layout_check_timer.stop()
+             return
+
+        current_sys_name = self.xkb_manager.query_current_layout_name()
+        internal_name = self.xkb_manager.get_current_layout_name()
+
+        if current_sys_name and current_sys_name != internal_name:
+            print(f"Timer detected layout change: {current_sys_name}. Syncing...")
+            self.sync_vk_lang_with_system_slot()
 
     def update_tray_menu_check_state(self):
-        if not self.xkb_manager or not self.lang_action_group: return
+        """Updates the check state of the language actions in the tray menu."""
+        if not self.xkb_manager or not self.lang_action_group or not self.language_actions: return
         current_internal_name = self.xkb_manager.get_current_layout_name()
         if not current_internal_name: return
-        action_to_check = self.language_actions.get(current_internal_name); checked_action = self.lang_action_group.checkedAction()
+
+        action_to_check = self.language_actions.get(current_internal_name)
+        checked_action = self.lang_action_group.checkedAction()
+
         if checked_action and checked_action != action_to_check:
             checked_action.blockSignals(True); checked_action.setChecked(False); checked_action.blockSignals(False)
         if action_to_check and not action_to_check.isChecked():
             action_to_check.blockSignals(True); action_to_check.setChecked(True); action_to_check.blockSignals(False)
 
-    def check_system_layout(self):
-        if not self.xkb_manager:
-             if self.layout_check_timer.isActive(): self.layout_check_timer.stop(); return
-        try:
-            current_sys_name = self.xkb_manager.query_current_layout_name()
-            internal_name = self.xkb_manager.get_current_layout_name()
-            if current_sys_name and current_sys_name != internal_name:
-                print(f"External layout change: {current_sys_name}. Syncing..."); self.sync_vk_lang_with_system()
-        except Exception as e: pass
-
     def toggle_language(self):
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
         if not self.xkb_manager:
-             self.current_language = 'ar' if self.current_language == 'en' else 'en'; self.update_key_labels(); QMessageBox.information(self, "Layout Info", "XKB Manager unavailable."); return
+             codes = list(self.loaded_layouts.keys())
+             if not codes: codes = ['us']
+             try: idx = codes.index(self.current_language)
+             except ValueError: idx = -1
+             next_idx = (idx + 1) % len(codes)
+             self.current_language = codes[next_idx]
+             self.update_key_labels(); QMessageBox.information(self, "Layout Info", "XKB Manager unavailable."); return
         if len(self.xkb_manager.get_available_layouts()) <= 1:
-             QMessageBox.information(self, "Layout Info", "Only one layout configured."); self.sync_vk_lang_with_system(); return
+             QMessageBox.information(self, "Layout Info", "Only one layout configured."); self.sync_vk_lang_with_system_slot(); return
         print("Toggling language...");
-        if not self.xkb_manager.cycle_next_layout(): QMessageBox.warning(self, "Layout Switch Failed", "setxkbmap command failed.")
-        self.sync_vk_lang_with_system()
+        if not self.xkb_manager.cycle_next_layout():
+             QMessageBox.warning(self, "Layout Switch Failed", f"{self.xkb_manager.get_current_method()} command failed.")
+        if not self.xkb_manager.can_monitor():
+             QTimer.singleShot(50, self.sync_vk_lang_with_system_slot)
 
     def set_system_language_from_menu(self, lang_code):
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
         if not self.xkb_manager: self.update_tray_menu_check_state(); return
         print(f"Tray: Setting layout to '{lang_code}'...");
         if not self.xkb_manager.set_layout_by_name(lang_code, update_system=True):
-            QMessageBox.warning(self, "Layout Switch Failed", f"Could not switch to '{lang_code}'."); self.update_tray_menu_check_state()
-        else: self.sync_vk_lang_with_system()
-        # لا تظهر النافذة عند الاختيار من القائمة، اتركها مخفية إذا كانت مخفية
-        # if self.isHidden(): self.show_normal_and_raise()
+            QMessageBox.warning(self, "Layout Switch Failed", f"Could not switch to '{lang_code}' using {self.xkb_manager.get_current_method()}.");
+        if not self.xkb_manager.can_monitor():
+             QTimer.singleShot(50, self.sync_vk_lang_with_system_slot)
 
     def update_key_labels(self):
         symbol_map = { "Caps Lock": "⇪ Caps", "Tab": "⇥ Tab", "Enter": "↵ Enter", "Backspace": "⌫ Bksp", "Up": "↑", "Down": "↓", "Left": "←", "Right": "→", "L Win": "◆", "R Win": "◆", "App": "☰", "Scroll Lock": "Scroll Lk", "Pause": "Pause", "PrtSc":"PrtSc", "Insert":"Ins", "Home":"Home", "Page Up":"PgUp", "Delete":"Del", "End":"End", "Page Down":"PgDn", "L Ctrl":"Ctrl", "R Ctrl":"Ctrl", "L Alt":"Alt", "R Alt":"AltGr", "Space":"Space", "Esc":"Esc", "About":"About", "Set":"Set", "LShift": "⇧ Shift", "RShift": "⇧ Shift", "Minimize":"_", "Close":"X", "Donate":"Donate"}
+
+        active_layout_code = self.current_language
+        active_layout_map = self.loaded_layouts.get(active_layout_code)
+        fallback_map = self.loaded_layouts.get('us', self.loaded_layouts.get('en', FALLBACK_CHAR_MAP))
+        if active_layout_map is None:
+            # print(f"Warning: Layout '{active_layout_code}' not loaded. Using fallback.") # Less verbose
+            active_layout_map = fallback_map
+
         for key_name, button in self.buttons.items():
-            if not button: continue; new_label = key_name; toggled = False
-            # --- *** تعديل: إزالة Win من قائمة is_mod *** ---
-            is_mod = key_name in ['LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock'] # Win keys are not toggling mods
-            # --- *** نهاية التعديل *** ---
-            if key_name == 'Lang': new_label = 'EN' if self.current_language == 'ar' else 'AR'
+            if not button: continue
+            new_label = key_name
+            toggled = False
+            is_mod_visual = key_name in ['LShift', 'RShift', 'L Ctrl', 'R Ctrl', 'L Alt', 'R Alt', 'Caps Lock']
+
+            if key_name == 'Lang':
+                available_layouts = self.xkb_manager.get_available_layouts() if self.xkb_manager else list(self.loaded_layouts.keys())
+                if not available_layouts: available_layouts = ['us']
+                current_index = -1
+                try: current_index = available_layouts.index(self.current_language)
+                except ValueError: pass
+                next_index = (current_index + 1) % len(available_layouts) if len(available_layouts) > 0 else 0
+                next_lang_code = available_layouts[next_index] if len(available_layouts) > 0 else '??'
+                new_label = next_lang_code.upper()
+
             elif key_name in ['LShift', 'RShift']: new_label="⇧ Shift"; toggled=self.shift_pressed
             elif key_name in ['L Ctrl', 'R Ctrl']: new_label="Ctrl"; toggled=self.ctrl_pressed
             elif key_name in ['L Alt', 'R Alt']: new_label="Alt" if key_name=='L Alt' else "AltGr"; toggled=self.alt_pressed
-            # --- *** تعديل: إزالة حالة Win/Super المرئية *** ---
-            # elif key_name in ['L Win', 'R Win']: new_label="◆"; toggled=self.win_pressed # Removed toggle state
-            elif key_name in ['L Win', 'R Win']: new_label="◆" # Just set the label
-            # --- *** نهاية التعديل *** ---
+            elif key_name in ['L Win', 'R Win']: new_label="◆"
             elif key_name == 'Caps Lock': new_label=symbol_map.get(key_name, key_name); toggled=self.caps_lock_pressed
-            # --- *** تعديل: مفتاح App يعامل كرمز فقط *** ---
-            elif key_name == 'App': new_label="☰" # Just set the label
-            # --- *** نهاية التعديل *** ---
-            elif key_name in KEY_CHAR_MAP: # Character keys
-                char_map_for_key = KEY_CHAR_MAP[key_name]; char_tuple = char_map_for_key.get(self.current_language, char_map_for_key.get('en', (key_name,)*2))
-                index_to_use = 0; is_letter = key_name.isalpha() and len(key_name)==1; effective_shift = (self.shift_pressed ^ self.caps_lock_pressed) if is_letter else self.shift_pressed
-                if effective_shift and len(char_tuple) > 1: index_to_use = 1
-                new_label = char_tuple[index_to_use] if index_to_use < len(char_tuple) else char_tuple[0]
-            elif key_name in symbol_map: new_label = symbol_map[key_name] # Other symbol keys
+            elif key_name == 'App': new_label="☰"
+            elif key_name in X11_KEYSYM_MAP:
+                char_tuple = active_layout_map.get(key_name, fallback_map.get(key_name))
+
+                if char_tuple and isinstance(char_tuple, (list, tuple)) and len(char_tuple) >= 1:
+                    index_to_use = 0
+                    is_letter = key_name.isalpha() and len(key_name)==1
+                    should_be_shifted = (self.shift_pressed ^ self.caps_lock_pressed) if is_letter else self.shift_pressed
+                    if should_be_shifted and len(char_tuple) > 1:
+                        index_to_use = 1
+                    new_label = char_tuple[index_to_use] if index_to_use < len(char_tuple) else char_tuple[0]
+                elif key_name in symbol_map:
+                     new_label = symbol_map[key_name]
+            elif key_name in symbol_map: new_label = symbol_map[key_name]
             elif key_name.startswith("F") and key_name[1:].isdigit(): new_label = key_name
 
-            # Update text if changed
             if button.text() != new_label: button.setText(new_label)
 
-            # --- *** تعديل: تحديث الخاصية المرئية فقط للمفاتيح المعدلة الفعلية *** ---
-            # Update visual property only for actual toggling modifiers
-            if is_mod:
+            if is_mod_visual:
                 current_prop = button.property("modifier_on");
                 if current_prop is None or current_prop != toggled:
                     button.setProperty("modifier_on", toggled);
                     button.style().unpolish(button); button.style().polish(button)
             else:
-                # Ensure non-modifiers don't have the property set
                 current_prop = button.property("modifier_on")
                 if current_prop is not None and current_prop is True:
                      button.setProperty("modifier_on", False)
                      button.style().unpolish(button); button.style().polish(button)
-            # --- *** نهاية التعديل *** ---
 
     def _simulate_single_key_press(self, key_name):
         if not key_name: return False
         is_letter = key_name.isalpha() and len(key_name)==1
-        # --- تعديل: الأسهم لا تتأثر بـ Caps Lock ---
         if key_name in ['Up', 'Down', 'Left', 'Right']:
              effective_shift = self.shift_pressed
         else:
              effective_shift = (self.shift_pressed ^ self.caps_lock_pressed) if is_letter else self.shift_pressed
-        # --- نهاية التعديل ---
         sim_ok = self._send_xtest_key(key_name, effective_shift)
         return sim_ok
 
     def _send_xtest_key(self, key_name, simulate_shift, is_caps_toggle=False):
-        """ Sends the low-level XTEST key event sequence. Uses X_CONST alias now. """
+        """ Sends the low-level XTEST key event sequence. """
         caps_kc = xlib_int.get_caps_lock_keycode(); shift_kc = xlib_int.get_shift_keycode(); ctrl_kc = xlib_int.get_ctrl_keycode(); alt_kc = xlib_int.get_alt_keycode()
-        # --- *** تعديل: إزالة الحصول على win_kc هنا لأنه لا يستخدم كحالة تعديل *** ---
-        # win_keysym = X11_KEYSYM_MAP.get('L Win', 0)
-        # win_kc = xlib_int.keysym_to_keycode(win_keysym) if win_keysym else None
-        # --- *** نهاية التعديل *** ---
 
         if is_caps_toggle:
              if not self.xlib_ok or not caps_kc: print("XTEST Error: Cannot toggle Caps Lock"); return False
@@ -1084,14 +1022,8 @@ class VirtualKeyboard(QMainWindow):
         kc = xlib_int.keysym_to_keycode(keysym);
         if not kc: print(f"WARNING: No KeyCode for KeySym {hex(keysym)} ('{key_name}')"); return False
         press_shift = simulate_shift and shift_kc; press_ctrl = self.ctrl_pressed and ctrl_kc; press_alt = self.alt_pressed and alt_kc
-        # --- *** تعديل: إزالة حالة press_win *** ---
-        # press_win = self.win_pressed and win_kc
-        # --- *** نهاية التعديل *** ---
         ok = True
         try:
-            # --- *** تعديل: إزالة إرسال ضغطة Win هنا *** ---
-            # if press_win: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, win_kc)
-            # --- *** نهاية التعديل *** ---
             if press_ctrl: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, ctrl_kc)
             if press_alt: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, alt_kc)
             if press_shift: ok &= xlib_int.send_xtest_event(X_CONST.KeyPress, shift_kc)
@@ -1103,21 +1035,14 @@ class VirtualKeyboard(QMainWindow):
             if press_shift: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, shift_kc)
             if press_alt: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, alt_kc)
             if press_ctrl: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, ctrl_kc)
-            # --- *** تعديل: إزالة إرسال إفلات Win هنا *** ---
-            # if press_win: ok &= xlib_int.send_xtest_event(X_CONST.KeyRelease, win_kc)
-            # --- *** نهاية التعديل *** ---
             if not ok: raise Exception("Mod Release")
             return True
         except Exception as e:
             print(f"ERROR XTEST sequence '{key_name}': {e}"); self._handle_xtest_error()
-            # Attempt to release any potentially stuck modifiers
             try:
                 if press_shift: xlib_int.send_xtest_event(X_CONST.KeyRelease, shift_kc)
                 if press_alt: xlib_int.send_xtest_event(X_CONST.KeyRelease, alt_kc)
                 if press_ctrl: xlib_int.send_xtest_event(X_CONST.KeyRelease, ctrl_kc)
-                # --- *** تعديل: إزالة محاولة إفلات Win في حالة الخطأ *** ---
-                # if press_win: xlib_int.send_xtest_event(X_CONST.KeyRelease, win_kc)
-                # --- *** نهاية التعديل *** ---
             except Exception: pass
             return False
 
@@ -1127,7 +1052,6 @@ class VirtualKeyboard(QMainWindow):
             msg = "X connection lost?" if critical else "Key simulation error."
             QMessageBox.warning(self, "XTEST Error", f"{msg}\nXTEST disabled."); self.init_tray_icon()
 
-    # --- *** تعديل: إزالة معالجة Win هنا *** ---
     def on_modifier_key_press(self, key_name):
         """ Handles clicks on modifier keys (Shift, Ctrl, Alt, Caps). """
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
@@ -1135,14 +1059,13 @@ class VirtualKeyboard(QMainWindow):
         if key_name in ['LShift', 'RShift']: self.shift_pressed = not self.shift_pressed; mod_changed=True
         elif key_name in ['L Ctrl', 'R Ctrl']: self.ctrl_pressed = not self.ctrl_pressed; mod_changed=True
         elif key_name in ['L Alt', 'R Alt']: self.alt_pressed = not self.alt_pressed; mod_changed=True
-        # elif key_name in ['L Win', 'R Win']: self.win_pressed = not self.win_pressed; mod_changed=True # Removed Win handling
+        # Win key is handled by on_non_repeatable_key_press now
         elif key_name == 'Caps Lock':
             sim_success = self._send_xtest_key(key_name, False, is_caps_toggle=True)
             if sim_success: self.caps_lock_pressed = not self.caps_lock_pressed
             else: QMessageBox.warning(self, "Caps Lock Error", "Could not toggle sys Caps Lock.")
             mod_changed = True
         if mod_changed: self.update_key_labels()
-    # --- *** نهاية التعديل *** ---
 
     def on_non_repeatable_key_press(self, key_name):
         """ Handles clicks on non-repeatable keys like Esc, F-keys, Win, App. """
@@ -1152,12 +1075,8 @@ class VirtualKeyboard(QMainWindow):
         released_mods = False
         if sim_ok:
             # Release non-sticky modifiers (Ctrl, Alt) after a non-repeatable key press
-            # We don't release Shift here as it's sticky until a typable key is pressed
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
-            # --- *** تعديل: إزالة تحرير Win هنا *** ---
-            # if self.win_pressed: self.win_pressed = False; released_mods = True
-            # --- *** نهاية التعديل *** ---
         if released_mods: self.update_key_labels()
 
     def _handle_key_pressed(self, key_name):
@@ -1165,8 +1084,10 @@ class VirtualKeyboard(QMainWindow):
         if self.repeating_key_name and self.repeating_key_name != key_name:
             self._handle_key_released(self.repeating_key_name, force_stop=True)
 
-        # --- تحديد ما إذا كان يجب تحرير المفاتيح المعدلة ---
-        should_release_mods = key_name in KEY_CHAR_MAP or key_name in ['Space', 'Backspace', 'Delete', 'Tab', 'Enter']
+        # Release modifiers ONLY for typable keys (letters, numbers, symbols) + Space
+        should_release_mods = key_name in FALLBACK_CHAR_MAP or key_name == 'Space'
+        if key_name in ['Backspace', 'Delete', 'Tab', 'Enter', 'Up', 'Down', 'Left', 'Right']:
+             should_release_mods = False
 
         sim_ok = self._simulate_single_key_press(key_name)
         released_mods = False
@@ -1174,14 +1095,10 @@ class VirtualKeyboard(QMainWindow):
             if self.shift_pressed: self.shift_pressed = False; released_mods = True
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
-            # --- *** تعديل: إزالة تحرير Win هنا *** ---
-            # if self.win_pressed: self.win_pressed = False; released_mods = True
-            # --- *** نهاية التعديل *** ---
 
         if released_mods:
              self.update_key_labels()
 
-        # بدء مؤقت التكرار فقط إذا نجحت المحاكاة وإذا تم تمكين التكرار
         if sim_ok and self.settings.get("auto_repeat_enabled", DEFAULT_SETTINGS.get("auto_repeat_enabled", True)):
             self.repeating_key_name = key_name
             self.initial_delay_timer.start()
@@ -1189,7 +1106,7 @@ class VirtualKeyboard(QMainWindow):
     def _handle_key_released(self, key_name, force_stop=False):
         """ Handles the release of a potentially repeating key. """
         if force_stop or (self.repeating_key_name == key_name):
-            if self.repeating_key_name: # Only act if a key was actually repeating
+            if self.repeating_key_name:
                 self.initial_delay_timer.stop()
                 self.auto_repeat_timer.stop()
                 self.repeating_key_name = None
@@ -1219,17 +1136,12 @@ class VirtualKeyboard(QMainWindow):
         """ Handles right-click on typable keys: Simulates Shift + Key. """
         print(f"Right-click detected on typable key: {key_name}")
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
-        # محاكاة الضغط مع شيفت
         sim_ok = self._send_xtest_key(key_name, True) # Simulate shift = True
         released_mods = False
         if sim_ok:
-            # لا تقم بتحرير شيفت عند النقر بزر الماوس الأيمن
-            # if self.shift_pressed: self.shift_pressed = False; released_mods = True
+            # Release Ctrl and Alt after right-click simulation
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
-            # --- *** تعديل: إزالة تحرير Win هنا *** ---
-            # if self.win_pressed: self.win_pressed = False; released_mods = True
-            # --- *** نهاية التعديل *** ---
         if released_mods: self.update_key_labels()
 
 
