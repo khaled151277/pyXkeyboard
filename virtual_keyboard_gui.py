@@ -1,24 +1,25 @@
 # -*- coding: utf-8 -*-
 # file:virtual_keyboard_gui.py
-# PyXKeyboard v1.0.5 - A simple, customizable on-screen virtual keyboard.
+# PyXKeyboard v1.0.6 - A simple, customizable on-screen virtual keyboard.
 # Features include X11 key simulation (XTEST), system layout switching (XKB),
 # visual layout updates, configurable appearance (fonts, colors, opacity, styles),
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.
 # Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 # Contains the main VirtualKeyboard class, UI, event handling, and integration logic.
-# --- Modified to load layout definitions from JSON files ---
+# --- Modified to load layout definitions from JSON files based on system config ---
 # --- Fixed missing update_tray_menu_check_state ---
 # --- Fixed Win/App key handling ---
 # --- Refactored update_key_labels for correct Shift/Caps state & layout loading ---
-# --- Reverted automatic text color selection for system themes ---
+# --- Fixed text color application when using system colors ---
+# --- Corrected JSON loading validation and label update logic for null ---
 
 import sys
 import os
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List, Union # Added List, Union
 import re
 import copy
 import webbrowser
-from pathlib import Path # Required for file URI in About dialog
+from pathlib import Path
 import json # Required for loading layout files
 
 try:
@@ -97,7 +98,7 @@ class VirtualKeyboard(QMainWindow):
         self.resizing = False; self.resize_edge = EDGE_NONE; self.resize_start_pos = None; self.resize_start_geom = None
         self.resize_margin = 4
         self.setMouseTracking(True)
-        self.buttons = {}; self.current_language = 'us';
+        self.buttons = {}; self.current_language = 'us'; # Start with a default like 'us'
         self.shift_pressed = False; self.ctrl_pressed = False; self.alt_pressed = False; self.caps_lock_pressed = False
         self.drag_position = None; self.xkb_manager = None; self.tray_icon = None; self.icon = None; self.language_menu = None; self.language_actions = {}; self.lang_action_group = None
         self.focus_monitor = None; self.focus_monitor_available = _focus_monitor_available
@@ -105,9 +106,9 @@ class VirtualKeyboard(QMainWindow):
         self.monitor_was_running_for_context_menu = False
         self.layout_check_timer = None
 
-        self.loaded_layouts: Dict[str, Dict] = {}
+        self.loaded_layouts: Dict[str, Dict[str, Union[list, tuple]]] = {} # Type hint correction
         self.layouts_dir = os.path.join(os.path.dirname(__file__), 'layouts')
-        self._load_layout_files()
+        # Layouts are loaded after XKB Manager initialization
 
         self.icon = self.load_app_icon()
 
@@ -116,61 +117,94 @@ class VirtualKeyboard(QMainWindow):
         self.auto_repeat_timer = QTimer(self); self.auto_repeat_timer.timeout.connect(self._trigger_subsequent_repeat)
         self._update_repeat_timers_from_settings()
 
-        self.init_xkb_manager()
+        self.init_xkb_manager() # This now loads layouts based on system config
         self.central_widget = QWidget(); self.central_widget.setObjectName("centralWidget"); self.central_widget.setMouseTracking(True); self.central_widget.setAutoFillBackground(True)
         self.setCentralWidget(self.central_widget); self.grid_layout = QGridLayout(self.central_widget); self.grid_layout.setSpacing(3); self.grid_layout.setContentsMargins(5, 5, 5, 5)
         self.init_focus_monitor()
         self._apply_global_styles_and_font()
-        self.init_ui()
+        self.init_ui() # Creates buttons
 
         if self.icon: self.setWindowIcon(self.icon)
-        self.init_tray_icon()
+        self.init_tray_icon() # Setup tray after buttons potentially exist
         self.apply_initial_geometry()
 
+        # Set initial language correctly *after* UI and XKB Manager are initialized
         initial_lang = self.xkb_manager.get_current_layout_name() if self.xkb_manager else None
         if not initial_lang or (initial_lang not in self.loaded_layouts and initial_lang not in ['us', 'en']):
              if 'us' in self.loaded_layouts: initial_lang = 'us'
              elif 'en' in self.loaded_layouts: initial_lang = 'en'
              elif self.loaded_layouts: initial_lang = next(iter(self.loaded_layouts))
              else: initial_lang = 'us'
-        self.sync_vk_lang_with_system_slot(initial_lang)
+        self.sync_vk_lang_with_system_slot(initial_lang) # Sync visuals with initial lang
 
-        # Sticky state removed
+        # Sticky state application removed
         # QTimer.singleShot(100, lambda: self._set_sticky_state(self.is_sticky))
 
-    def _load_layout_files(self):
-        """Loads .json layout files from the layouts directory."""
-        print(f"Loading layouts from: {self.layouts_dir}")
+    # --- *** تعديل: دالة تحميل ملفات التخطيط المطلوبة *** ---
+    def _load_layout_files(self, required_layout_codes: List[str]):
+        """Loads required .json layout files from the layouts directory."""
+        print(f"Loading required layouts ({required_layout_codes}) from: {self.layouts_dir}")
         if not os.path.isdir(self.layouts_dir):
             print(f"Warning: Layouts directory not found: {self.layouts_dir}")
             return
 
-        self.loaded_layouts = {}
-        for filename in os.listdir(self.layouts_dir):
-            if filename.endswith(".json"):
-                layout_code = filename[:-5]
-                filepath = os.path.join(self.layouts_dir, filename)
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        layout_data = json.load(f)
-                        if isinstance(layout_data, dict):
-                            valid = True
-                            for k, v in layout_data.items():
-                                if not isinstance(k, str) or not isinstance(v, (list, tuple)) or not all(isinstance(char, str) for char in v):
-                                    print(f"  - Warning: Invalid data structure for key '{k}' in {filename}. Skipping file.", file=sys.stderr)
-                                    valid = False
-                                    break
-                            if valid:
-                                self.loaded_layouts[layout_code] = layout_data
-                                print(f"  - Loaded layout '{layout_code}' from {filename}")
-                        else:
-                            print(f"  - Warning: Invalid format in {filename} (not a dictionary). Skipping.", file=sys.stderr)
-                except json.JSONDecodeError as e:
-                    print(f"  - Error decoding JSON in {filename}: {e}. Skipping.", file=sys.stderr)
-                except IOError as e:
-                    print(f"  - Error reading file {filename}: {e}. Skipping.", file=sys.stderr)
-                except Exception as e:
-                    print(f"  - Unexpected error loading {filename}: {e}. Skipping.", file=sys.stderr)
+        self.loaded_layouts = {} # Clear previous layouts
+
+        # --- Always try to load fallback layouts first ---
+        fallback_codes_to_try = ['us', 'en']
+        loaded_fallback = None
+        for code in fallback_codes_to_try:
+             filepath = os.path.join(self.layouts_dir, f"{code}.json")
+             if os.path.exists(filepath):
+                  if self._load_single_layout_file(code, filepath):
+                       print(f"  - Loaded essential fallback layout '{code}'.")
+                       loaded_fallback = code # Remember which fallback was loaded
+                       break # Load only one primary fallback (prefer 'us')
+
+        if not loaded_fallback and not FALLBACK_CHAR_MAP:
+             print("ERROR: No fallback layout (us.json/en.json) found and FALLBACK_CHAR_MAP is empty!", file=sys.stderr)
+             # Application might be unusable without any base layout
+
+        # --- Load layouts required by the system ---
+        for layout_code in required_layout_codes:
+            if layout_code in self.loaded_layouts: # Don't reload if it was the fallback
+                 continue
+            filepath = os.path.join(self.layouts_dir, f"{layout_code}.json")
+            if os.path.exists(filepath):
+                self._load_single_layout_file(layout_code, filepath)
+            else:
+                print(f"  - Warning: Layout file '{layout_code}.json' not found for system layout '{layout_code}'. Display will use fallback.")
+
+    def _load_single_layout_file(self, layout_code: str, filepath: str) -> bool:
+        """Loads and validates a single JSON layout file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                layout_data = json.load(f)
+                if isinstance(layout_data, dict):
+                    valid = True
+                    for k, v in layout_data.items():
+                        if not isinstance(k, str) or \
+                           not isinstance(v, (list, tuple)) or \
+                           not (1 <= len(v) <= 2) or \
+                           not isinstance(v[0], str) or \
+                           (len(v) == 2 and not isinstance(v[1], (str, type(None)))):
+                            print(f"  - Warning: Invalid data structure for key '{k}' in {os.path.basename(filepath)} (value: {v}). Skipping file.", file=sys.stderr)
+                            valid = False
+                            break
+                    if valid:
+                        self.loaded_layouts[layout_code] = layout_data
+                        print(f"  - Loaded layout data for '{layout_code}' from {os.path.basename(filepath)}")
+                        return True
+                else:
+                    print(f"  - Warning: Invalid format in {os.path.basename(filepath)} (not a dictionary). Skipping.", file=sys.stderr)
+        except json.JSONDecodeError as e:
+            print(f"  - Error decoding JSON in {os.path.basename(filepath)}: {e}. Skipping.", file=sys.stderr)
+        except IOError as e:
+            print(f"  - Error reading file {os.path.basename(filepath)}: {e}. Skipping.", file=sys.stderr)
+        except Exception as e:
+            print(f"  - Unexpected error loading {os.path.basename(filepath)}: {e}. Skipping.", file=sys.stderr)
+        return False
+    # --- *** نهاية التعديل *** ---
 
     def load_app_icon(self) -> Optional[QIcon]:
         icon = QIcon()
@@ -229,16 +263,24 @@ class VirtualKeyboard(QMainWindow):
         self.setMinimumSize(min_width, min_height)
 
     def init_xkb_manager(self):
-        """Initializes the XKBManager and starts monitoring or timer."""
+        """Initializes the XKBManager, loads corresponding layouts, and starts monitoring/timer."""
         self.xkb_manager = None
         if self.layout_check_timer and self.layout_check_timer.isActive():
             self.layout_check_timer.stop()
         self.layout_check_timer = None
 
+        system_layouts = [] # Default to empty list
+
         try:
             self.xkb_manager = XKBManager(auto_refresh=True, start_monitoring=False)
 
             if self.xkb_manager and self.xkb_manager.get_current_method() != XKBManager.METHOD_NONE:
+                system_layouts = self.xkb_manager.get_available_layouts()
+                print(f"System layouts detected: {system_layouts}")
+
+                # Load layout files corresponding to system layouts AFTER manager is initialized
+                self._load_layout_files(system_layouts)
+
                 self.xkb_manager.layoutChanged.connect(self.sync_vk_lang_with_system_slot, Qt.ConnectionType.QueuedConnection)
 
                 if self.xkb_manager.can_monitor():
@@ -250,12 +292,15 @@ class VirtualKeyboard(QMainWindow):
                     self.layout_check_timer.timeout.connect(self.check_system_layout_timer_slot)
                     self.layout_check_timer.start(1000)
             else:
-                print("XKB Manager could not be initialized with any method.")
+                print("XKB Manager could not be initialized with any method. Loading default layouts only.")
+                self._load_layout_files(['us', 'en', 'ar'])
                 self.current_language = 'us' # Fallback language
 
         except (XKBManagerError, Exception) as e:
             print(f"XKBManager Initialization FAILED: {e}", file=sys.stderr)
             self.xkb_manager = None
+            print("Loading default layouts due to XKB Manager error.")
+            self._load_layout_files(['us', 'en', 'ar'])
             self.current_language = 'us'
 
     def init_focus_monitor(self):
@@ -277,8 +322,8 @@ class VirtualKeyboard(QMainWindow):
     def show_normal_and_raise(self):
         if self.isHidden(): self.showNormal(); self.raise_()
 
-    # --- *** تعديل: إلغاء الحساب التلقائي للون النص *** ---
     def _apply_global_styles_and_font(self):
+        """Applies styles based on settings, handling system colors and custom colors."""
         if not self.central_widget: return
         use_system_colors = self.settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
         custom_text_color = self.settings.get("text_color", DEFAULT_SETTINGS.get("text_color", "#FFFFFF"))
@@ -288,26 +333,29 @@ class VirtualKeyboard(QMainWindow):
         window_bg_color_setting = self.settings.get("window_background_color", DEFAULT_SETTINGS.get("window_background_color", "#F0F0F0"))
         button_bg_color_setting = self.settings.get("button_background_color", DEFAULT_SETTINGS.get("button_background_color", "#E1E1E1"))
 
-        # --- استخدام لون النص المحدد في الإعدادات دائمًا ---
+        # --- Use the custom text color setting directly ---
         final_text_color_str = custom_text_color
-        print(f"Applying text color: {final_text_color_str}")
-        # --- نهاية التعديل ---
+        try:
+            final_text_qcolor = QColor(final_text_color_str)
+            # print(f"Applying text color: {final_text_color_str}")
+        except Exception:
+            print(f"Warning: Invalid text color '{custom_text_color}'. Using default black.", file=sys.stderr)
+            final_text_color_str = "#000000"
+            final_text_qcolor = QColor(final_text_color_str)
 
-
-        # --- بناء أنماط الأزرار الأساسية ---
+        # --- Build base button style parts ---
         common_button_style_parts = [
-            f"color: {final_text_color_str};", # Apply the chosen text color
+            f"color: {final_text_color_str};", # Always apply text color via CSS first
             f"font-family: '{font_family}';",
             f"font-size: {font_size}pt;",
             "padding: 2px;"
         ]
 
-        # --- تحديد أجزاء النمط الخاصة بناءً على خيارات المستخدم ---
         button_specific_style_parts = []
         base_button_style = ""
 
         if not use_system_colors:
-            # --- تطبيق الألوان والأنماط المخصصة ---
+            # --- Apply custom styles if not using system theme ---
             if button_style_name == "flat":
                 button_specific_style_parts.extend([
                     f"background-color: {button_bg_color_setting};",
@@ -317,24 +365,21 @@ class VirtualKeyboard(QMainWindow):
                     "border: 1px solid #bbbbbb;",
                     """background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #fefefe, stop: 1 #e0e0e0);""",
                     "border-radius: 4px;" ])
-            else: # "default" button style with custom colors
+            else: # default style with custom colors
                 button_specific_style_parts.append(f"background-color: {button_bg_color_setting};")
                 button_specific_style_parts.append("border: 1px solid #C0C0C0;")
-
             base_button_style = " ".join(common_button_style_parts + button_specific_style_parts)
         else:
-            # --- استخدام ألوان وأنماط النظام ---
-            # Only apply common parts (font, padding, text color)
+            # --- Use system theme (only common parts applied in base) ---
             button_specific_style_parts = []
             base_button_style = " ".join(common_button_style_parts)
-
 
         # --- Styles for special states/buttons ---
         toggled_modifier_style = "background-color: #a0cfeC !important; border: 1px solid #0000A0 !important; font-weight: bold;"
         custom_control_style = "font-weight: bold; font-size: 10pt;"
         donate_style = "font-size: 10pt; font-weight: bold; background-color: yellow; color: black !important; border: 1px solid #A0A000;" # Force black color for donate
 
-        # --- تطبيق خلفية النافذة ---
+        # --- Apply window background ---
         alpha_value = int(max(0.0, min(1.0, opacity_level)) * 255)
         final_window_bg_rgba = "rgba(0,0,0,0)"
 
@@ -349,27 +394,25 @@ class VirtualKeyboard(QMainWindow):
              final_window_bg_rgba = f"rgba({base_color.red()}, {base_color.green()}, {base_color.blue()}, {alpha_value})"
 
         bg_style = f"background-color: {final_window_bg_rgba} !important;"
+        # Ensure the central widget gets the background color
         self.central_widget.setStyleSheet(f"QWidget#centralWidget {{ {bg_style} }}")
+        # Also set autoFillBackground - might help with themes
+        self.central_widget.setAutoFillBackground(True)
 
-        # --- تطبيق الأنماط النهائية ---
+
+        # --- Apply final stylesheet to the main window ---
         full_stylesheet = f"""
             QPushButton {{ {base_button_style} }}
-            /* Text color is now included in base_button_style */
+            /* Explicitly set text color again for higher specificity if needed */
+            QPushButton {{ color: {final_text_color_str}; }}
             QPushButton:pressed {{ background-color: #cceeff !important; border: 1px solid #88aabb !important; }}
             QPushButton[modifier_on="true"] {{ {toggled_modifier_style} }}
-            QPushButton#MinimizeButton, QPushButton#CloseButton {{ {custom_control_style} }}
+            QPushButton#MinimizeButton, QPushButton#CloseButton {{ {custom_control_style} color: {final_text_color_str}; }} /* Ensure text color */
             QPushButton#DonateButton {{ {donate_style} }}
         """
         self.setStyleSheet(full_stylesheet)
 
-        # --- *** إزالة حلقة تطبيق QPalette *** ---
-        # if use_system_colors:
-        #     print(f"Applying text color explicitly via Palette: {final_text_color_str}")
-        #     final_text_qcolor = QColor(final_text_color_str)
-        #     for key_name, button in self.buttons.items():
-        #         # ... (palette code removed) ...
-    # --- *** نهاية التعديل *** ---
-
+        # --- Palette application removed, relying on CSS ---
 
     def update_application_font(self, new_font): self.app_font = QFont(new_font)
     def update_application_opacity(self, opacity_level): self.settings["window_opacity"] = max(0.0, min(1.0, opacity_level))
@@ -608,7 +651,7 @@ class VirtualKeyboard(QMainWindow):
             main_info = f"""
              {badge_html}
              <div style="overflow: hidden;">
-             <p><b>{program_name} v1.0.5</b><br>A simple on-screen virtual keyboard.</p>
+             <p><b>{program_name} v1.0.6</b><br>A simple on-screen virtual keyboard.</p>
              <p>Developed by: Khaled Abdelhamid<br>Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
              <p><b>License:</b><br>GNU General Public License v3 (GPLv3)</p>
              <p><b>Disclaimer:</b><br>Provided 'as is'. Use at your own risk.</p>
@@ -629,7 +672,7 @@ class VirtualKeyboard(QMainWindow):
                         if not self.focus_monitor.is_running(): print("WARNING: Could not resume monitor.")
                     except Exception as e: print(f"ERROR resuming focus monitor: {e}")
                 else: print("Cannot resume focus monitor, instance is missing.")
-            self.init_tray_icon() # Refresh tray icon status
+            self.init_tray_icon()
 
     def open_settings_dialog(self):
         settings_copy = copy.deepcopy(self.settings); dialog = SettingsDialog(settings_copy, self.app_font, self.focus_monitor_available, self)
@@ -861,7 +904,7 @@ class VirtualKeyboard(QMainWindow):
 
             if not layout_exists:
                  print(f"Error: No suitable layout found for system layout '{current_sys_name}' and no fallbacks ('us', 'en'). Cannot update display.", file=sys.stderr)
-                 target_vk_lang = 'us' # Final fallback to 'us' to prevent errors
+                 target_vk_lang = 'us'
 
             if self.current_language != target_vk_lang:
                 print(f"Update visual layout: {self.current_language} -> {target_vk_lang}")
@@ -942,9 +985,9 @@ class VirtualKeyboard(QMainWindow):
 
         active_layout_code = self.current_language
         active_layout_map = self.loaded_layouts.get(active_layout_code)
-        fallback_map = self.loaded_layouts.get('us', self.loaded_layouts.get('en', FALLBACK_CHAR_MAP))
+        fallback_map = self.loaded_layouts.get('us', self.loaded_layouts.get('en', FALLBACK_CHAR_MAP if isinstance(FALLBACK_CHAR_MAP, dict) else {} ))
         if active_layout_map is None:
-            # print(f"Warning: Layout '{active_layout_code}' not loaded. Using fallback.") # Less verbose
+            # print(f"Warning: Layout '{active_layout_code}' not loaded. Using fallback.")
             active_layout_map = fallback_map
 
         for key_name, button in self.buttons.items():
@@ -976,9 +1019,11 @@ class VirtualKeyboard(QMainWindow):
                     index_to_use = 0
                     is_letter = key_name.isalpha() and len(key_name)==1
                     should_be_shifted = (self.shift_pressed ^ self.caps_lock_pressed) if is_letter else self.shift_pressed
-                    if should_be_shifted and len(char_tuple) > 1:
+                    if should_be_shifted and len(char_tuple) > 1 and char_tuple[1] is not None:
                         index_to_use = 1
                     new_label = char_tuple[index_to_use] if index_to_use < len(char_tuple) else char_tuple[0]
+                    if should_be_shifted and len(char_tuple) > 1 and char_tuple[1] is None:
+                        new_label = char_tuple[0]
                 elif key_name in symbol_map:
                      new_label = symbol_map[key_name]
             elif key_name in symbol_map: new_label = symbol_map[key_name]
@@ -996,6 +1041,7 @@ class VirtualKeyboard(QMainWindow):
                 if current_prop is not None and current_prop is True:
                      button.setProperty("modifier_on", False)
                      button.style().unpolish(button); button.style().polish(button)
+
 
     def _simulate_single_key_press(self, key_name):
         if not key_name: return False
@@ -1059,7 +1105,6 @@ class VirtualKeyboard(QMainWindow):
         if key_name in ['LShift', 'RShift']: self.shift_pressed = not self.shift_pressed; mod_changed=True
         elif key_name in ['L Ctrl', 'R Ctrl']: self.ctrl_pressed = not self.ctrl_pressed; mod_changed=True
         elif key_name in ['L Alt', 'R Alt']: self.alt_pressed = not self.alt_pressed; mod_changed=True
-        # Win key is handled by on_non_repeatable_key_press now
         elif key_name == 'Caps Lock':
             sim_success = self._send_xtest_key(key_name, False, is_caps_toggle=True)
             if sim_success: self.caps_lock_pressed = not self.caps_lock_pressed
@@ -1070,11 +1115,9 @@ class VirtualKeyboard(QMainWindow):
     def on_non_repeatable_key_press(self, key_name):
         """ Handles clicks on non-repeatable keys like Esc, F-keys, Win, App. """
         if self.repeating_key_name: self._handle_key_released(self.repeating_key_name, force_stop=True)
-        # Simulate the key press, respecting current Ctrl/Alt state but not Shift
-        sim_ok = self._send_xtest_key(key_name, False) # simulate_shift = False
+        sim_ok = self._send_xtest_key(key_name, False)
         released_mods = False
         if sim_ok:
-            # Release non-sticky modifiers (Ctrl, Alt) after a non-repeatable key press
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
         if released_mods: self.update_key_labels()
@@ -1084,7 +1127,6 @@ class VirtualKeyboard(QMainWindow):
         if self.repeating_key_name and self.repeating_key_name != key_name:
             self._handle_key_released(self.repeating_key_name, force_stop=True)
 
-        # Release modifiers ONLY for typable keys (letters, numbers, symbols) + Space
         should_release_mods = key_name in FALLBACK_CHAR_MAP or key_name == 'Space'
         if key_name in ['Backspace', 'Delete', 'Tab', 'Enter', 'Up', 'Down', 'Left', 'Right']:
              should_release_mods = False
@@ -1139,7 +1181,6 @@ class VirtualKeyboard(QMainWindow):
         sim_ok = self._send_xtest_key(key_name, True) # Simulate shift = True
         released_mods = False
         if sim_ok:
-            # Release Ctrl and Alt after right-click simulation
             if self.ctrl_pressed: self.ctrl_pressed = False; released_mods = True
             if self.alt_pressed: self.alt_pressed = False; released_mods = True
         if released_mods: self.update_key_labels()
