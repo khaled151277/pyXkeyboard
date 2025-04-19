@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # file:main.py
-# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# PyXKeyboard v1.0.7 - A simple, customizable on-screen virtual keyboard.
 # Features include X11 key simulation (XTEST), system layout switching (XKB),
 # visual layout updates, configurable appearance (fonts, colors, opacity, styles),
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.

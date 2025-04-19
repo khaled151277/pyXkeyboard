@@ -1,0 +1,49 @@
+{
+  "`": ["`", "~"],
+  "1": ["1", "!"],
+  "2": ["2", "@"],
+  "3": ["3", "#"],
+  "4": ["4", "$"],
+  "5": ["5", "%"],
+  "6": ["6", "^"],
+  "7": ["7", "&"],
+  "8": ["8", "*"],
+  "9": ["9", "("],
+  "0": ["0", ")"],
+  "-": ["-", "_"],
+  "=": ["=", "+"],
+  "Q": ["ض", "َ"], // Zād, Fatha
+  "W": ["ص", "ً"], // Sād, Tanwin Fath
+  "E": ["ث", "ُ"], // Tha', Damma
+  "R": ["ق", "ٌ"], // Qāf, Tanwin Damm
+  "T": ["ف", "،"], // Fa', Persian Comma
+  "Y": ["غ", "آ"], // Ghayn, Alif Madda
+  "U": ["ع", "‘"], // Ayn, Apostrophe-like char? or Hamza above? Using quote.
+  "I": ["ه", "]"], // Heh, Closing bracket
+  "O": ["خ", "["], // Kha', Opening bracket
+  "P": ["ح", "{"], // Hah, Closing brace
+  "[": ["ج", "}"], // Jeem, Opening brace
+  "]": ["چ", "؛"], // Tcheh, Persian Semicolon
+  "\\":["\\", "\|"], // Backslash, Pipe
+  "A": ["ش", "ِ"], // Sheen, Kasra
+  "S": ["س", "ٍ"], // Seen, Tanwin Kasr
+  "D": ["ی", "‌"], // Yeh, Zero-width non-joiner (Shift+D) - Important!
+  "F": ["ب", "لإ"], // Beh, Lam-Alif-Hamza Below
+  "G": ["ل", "لأ"], // Lam, Lam-Alif-Hamza Above
+  "H": ["ا", "أ"], // Alif, Alif-Hamza Above
+  "J": ["ت", "ـ"], // Teh, Tatweel/Kashida
+  "K": ["ن", "»"], // Noon, Right Guillemet
+  "L": ["م", "«"], // Meem, Left Guillemet
+  ";": ["ک", ":"], // Kaf, Colon
+  "'": ["گ", "\""], // Gaf, Quotation Mark
+  "Z": ["ظ", "ّ"], // Zah, Shadda
+  "X": ["ط", "ْ"], // Tah, Sukun
+  "C": ["ز", "ژ"], // Zain, Jeh (Shift+C)
+  "V": ["ر", "ؤ"], // Reh, Waw-Hamza Above
+  "B": ["ذ", "إ"], // Dhal, Alif-Hamza Below
+  "N": ["د", "أ"], // Dal, Alif-Hamza Above (same as Shift+G?) Check standard. Yes, often duplicated.
+  "M": ["پ", "ء"], // Peh, Hamza
+  ",": ["و", ">"], // Waw, Greater-than
+  ".": [".", "<"], // Period, Less-than
+  "/": ["/", "؟"]  // Slash, Persian Question Mark
+}

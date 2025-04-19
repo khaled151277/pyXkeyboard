@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # file:settings_dialog.py
-# PyXKeyboard v1.0.3 - A simple, customizable on-screen virtual keyboard.
+# PyXKeyboard v1.0.7 - A simple, customizable on-screen virtual keyboard.
 # Features include X11 key simulation (XTEST), system layout switching (XKB),
 # visual layout updates, configurable appearance (fonts, colors, opacity, styles),
 # auto-repeat, system tray integration, and optional AT-SPI based auto-show.
@@ -41,9 +41,8 @@ class SettingsDialog(QDialog):
         self.current_preview_font.setPointSize(self.temp_settings.get("font_size", DEFAULT_SETTINGS.get("font_size", 9)))
 
         self.setWindowTitle("Settings & Help")
-        # --- تحديد حجم ثابت 500x500 ---
-        self.setFixedSize(QSize(500, 500))
-        # --- نهاية التحديد ---
+
+
 
         layout = QVBoxLayout(self)
         self.tab_widget = QTabWidget()
@@ -99,14 +98,6 @@ class SettingsDialog(QDialog):
         self.always_on_top_checkbox.setToolTip("Keeps the keyboard window above other application windows on the current workspace.")
         self.always_on_top_checkbox.stateChanged.connect(self.on_always_on_top_changed)
         general_layout.addWidget(self.always_on_top_checkbox)
-
-        self.sticky_checkbox = QCheckBox("Show on all workspaces (Sticky) [Not Implemented]")
-        sticky = self.temp_settings.get("sticky_on_all_workspaces", DEFAULT_SETTINGS.get("sticky_on_all_workspaces", False))
-        self.sticky_checkbox.setChecked(sticky)
-        self.sticky_checkbox.setToolTip("Makes the keyboard visible on all virtual desktops/workspaces.\n(Currently not functional, requires Window Manager EWMH support)")
-        self.sticky_checkbox.stateChanged.connect(self.on_sticky_changed)
-        self.sticky_checkbox.setEnabled(False)
-        general_layout.addWidget(self.sticky_checkbox)
 
         self.auto_hide_checkbox = QCheckBox("Minimize window on middle mouse click")
         auto_hide = self.temp_settings.get("auto_hide_on_middle_click", DEFAULT_SETTINGS.get("auto_hide_on_middle_click", True))
@@ -178,7 +169,7 @@ class SettingsDialog(QDialog):
         appearance_layout.addRow(text_color_label, text_color_hbox)
 
         # --- Use System Colors Checkbox ---
-        self.use_system_colors_checkbox = QCheckBox("Use system theme colors for backgrounds")
+        self.use_system_colors_checkbox = QCheckBox("Use system theme colors:")
         use_sys_colors = self.temp_settings.get("use_system_colors", DEFAULT_SETTINGS.get("use_system_colors", False))
         self.use_system_colors_checkbox.setChecked(use_sys_colors)
         self.use_system_colors_checkbox.setToolTip("Overrides custom background colors below and button style.\nText color above is still applied.")
@@ -186,7 +177,7 @@ class SettingsDialog(QDialog):
         appearance_layout.addRow(self.use_system_colors_checkbox) # Add checkbox spanning columns
 
         # --- Button Background Color ---
-        self.button_bg_label = QLabel("Button Background Color (Custom / Flat only):") # Clarify when it's used
+        self.button_bg_label = QLabel("Button Backgound Color:") # Clarify when it's used
         button_bg_hbox = QHBoxLayout()
         self.button_bg_color_button = QPushButton("Choose...")
         self.button_bg_color_button.clicked.connect(self.on_button_bg_color_button_clicked)
@@ -199,7 +190,7 @@ class SettingsDialog(QDialog):
         appearance_layout.addRow(self.button_bg_label, button_bg_hbox)
 
         # --- Window Background Color ---
-        self.window_bg_label = QLabel("Window Background Color (Custom):") # Clarify when it's used
+        self.window_bg_label = QLabel("Window Backgound Color:") # Clarify when it's used
         window_bg_hbox = QHBoxLayout()
         self.window_bg_color_button = QPushButton("Choose...")
         self.window_bg_color_button.clicked.connect(self.on_window_bg_color_button_clicked)
@@ -307,10 +298,6 @@ class SettingsDialog(QDialog):
 
     def on_always_on_top_changed(self, state):
         self.temp_settings["always_on_top"] = (state == Qt.CheckState.Checked.value)
-
-    def on_sticky_changed(self, state):
-        # لن يتم استدعاؤها حاليًا
-        self.temp_settings["sticky_on_all_workspaces"] = (state == Qt.CheckState.Checked.value)
 
     def on_auto_hide_changed(self, state):
         self.temp_settings["auto_hide_on_middle_click"] = (state == Qt.CheckState.Checked.value)
