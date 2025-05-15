@@ -1,4 +1,4 @@
-# pyxkeyboard v1.0.5
+# pyxkeyboard v1.0.7
 
 A simple, customizable OSK on-screen virtual keyboard for Linux systems (primarily X11/Xorg), featuring layout switching, key simulation via XTEST, and optional auto-show functionality using AT-SPI.
 
@@ -8,9 +8,10 @@ A simple, customizable OSK on-screen virtual keyboard for Linux systems (primari
 ## Key Features
 
 *   **On-Screen Typing:** Click keys to simulate input into other applications (using XTEST).
-*   **System Layout Switching:** Easily switch between configured system keyboard layouts (e.g., English, Arabic) using the `Lang` button or the system tray menu (uses `xkb-switch` if available, otherwise `setxkbmap`).
-*   **Visual Layout Display:** Keyboard display automatically reflects the currently active system layout (loads characters from corresponding layout files like `layouts/us.json`, `layouts/ar.json`).
-*   **Modifier Keys:** Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next non-modifier key press. `Win`/`Super` keys act as single-press keys.
+*   **System Layout Switching:** Easily switch between configured system keyboard layouts (e.g., English, Arabic) using the `Lang` buttons or the system tray menu (uses `xkb-switch` if available, otherwise `setxkbmap`). The three `Lang` buttons display the current, next, and next+1 layouts in the cycle.
+*   **Visual Layout Display:** Keyboard display automatically reflects the currently active system layout. Character mappings are loaded from corresponding JSON files (e.g., `layouts/us.json`, `layouts/ar.json`).
+    *   See [Custom Layout File Format (English)](CH_MAP_JSON_eng.html) or [تنسيق ملف التخطيط المخصص (العربية)](CH_MAP_JSON_ara.html) for details on creating your own.
+*   **Modifier Keys:** Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next typable key press (letters, numbers, symbols, space). `Win`/`Super` keys act as single-press keys.
 *   **Right-Click Shift:** Right-click character keys to simulate `Shift + Key`.
 *   **Movable:** Drag the window background using the **left mouse button** to reposition (works whether frameless or framed).
 *   **Always on Top:** Option to keep the keyboard window visible above other application windows (Default: On).
@@ -26,7 +27,7 @@ A simple, customizable OSK on-screen virtual keyboard for Linux systems (primari
         *   Choose button style (Default, Flat, Gradient).
     *   Set window background **opacity** (works for both framed and frameless windows, compositor support required, Default: 0.9).
 *   **Configurable Behavior:**
-    *   **Frameless Window:** Option to remove the window title bar and borders (Default: On).
+    *   **Frameless Window:** Option to remove the window title bar and borders (Default: On). Window is resizable by dragging edges if frameless.
     *   Remember window position and size.
     *   Optional middle-click on background to hide to tray.
     *   **Auto-show when editing text:** Automatically shows the keyboard when focus enters an editable text field (requires AT-SPI accessibility services).
@@ -62,7 +63,7 @@ Ensure the following packages are installed on your Debian/Ubuntu-based system. 
     # For Auto-Show feature:
     sudo apt install python3-gi gir1.2-atspi-2.0
 
-    # For default font:
+    # For default font (example for Arabic):
     sudo apt install fonts-noto-naskh-arabic
     ```
     *Note: The Auto-Show feature also requires **Accessibility Services (AT-SPI Bus)** to be enabled in your Desktop Environment settings (check Accessibility/Universal Access). You might need to log out and log back in after enabling it.*
@@ -99,7 +100,7 @@ sudo apt remove pyxkeyboard
 For development or testing without installation:
 ```bash
 # Clone the repository first if you haven't already
-# git clone https://github.com/khaled151277/pyxkeyboard.git
+# git clone <repository_url>
 # cd pyxkeyboard
 # From the project root directory:
 python3 -m pyxkeyboard.main
@@ -109,19 +110,19 @@ python3 -m pyxkeyboard.main
 
 1.  **Starting:** Launch "PyXKeyboard" from your application menu or run `pyxkeyboard` in the terminal.
 2.  **Typing:** Open your target application, then click keys on the virtual keyboard.
-3.  **Modifiers:** Click `Shift`, `Ctrl`, or `Alt` once to activate for the next key. Click `Caps Lock` to toggle. Right-click character keys for Shift+Key. `Win`/`Super` keys act as single presses.
+3.  **Modifiers:** Click `Shift`, `Ctrl`, or `Alt` once to activate for the next typable key. Click `Caps Lock` to toggle. Right-click character keys for Shift+Key. `Win`/`Super` keys act as single presses.
 4.  **Arrow Keys & Repeat:** Click arrow keys or other repeatable keys. Long-press triggers auto-repeat if enabled.
-5.  **Switching Layouts:** Use the `Lang` button to cycle or right-click the tray icon -> "Select Layout". The display updates based on `.json` files in the installation's `layouts` directory.
-6.  **Moving:** Left-click and drag the background area.
+5.  **Switching Layouts:** Use the `Lang` buttons to cycle or right-click the tray icon -> "Select Layout". The display updates based on `.json` files in the installation's `layouts` directory. The `Lang` buttons show (Current), (Next), (Next+1) layouts.
+6.  **Moving:** Left-click and drag the background area. If frameless, drag edges to resize.
 7.  **Minimizing / Hiding:** Use window controls, the custom `_` button (if frameless), or middle-click the background (if enabled).
 8.  **Showing from Tray:** Left-click the tray icon or use the right-click menu.
-9.  **Settings (<code>Set</code> button):** Configure appearance and behavior (500x500 window). Note that "Use system theme colors" overrides custom backgrounds and button style, but respects the custom text color setting.
+9.  **Settings (<code>Set</code> button):** Configure appearance and behavior. Note that "Use system theme colors" overrides custom backgrounds and button style, but respects the custom text color setting.
 10. **Quitting:** Use the custom `X` button (if frameless), the tray menu, or the standard window close button (if framed and no tray).
 
 ## Troubleshooting
 
 *   **Typing doesn't work / wrong characters:** Check XTEST status in "About". Ensure `python-xlib` installed, you're on X11. Wrong characters usually mean system layout differs from keyboard's visual layout (e.g., system AZERTY vs visual QWERTY).
-*   **Correct language characters not displayed:** Ensure a `.json` file matching your system layout code (e.g., `ara.json`) exists in `/usr/lib/python*/site-packages/pyxkeyboard/layouts/`. Check logs for loading errors.
+*   **Correct language characters not displayed:** Ensure a `.json` file matching your system layout code (e.g., `ara.json`) exists in `/usr/lib/python*/site-packages/pyxkeyboard/layouts/`. Check logs for loading errors. See custom layout documentation.
 *   **Language switching fails:** Check XKB status in "About". Ensure `xkb-switch` or `setxkbmap` is installed. Configure multiple layouts in OS settings.
 *   **Tray icon missing:** Your desktop might lack tray support.
 *   **Middle-click hide fails:** Check the setting in General tab.
@@ -134,7 +135,7 @@ python3 -m pyxkeyboard.main
 
 ## About
 
-*   **Version:** 1.0.5
+*   **Version:** 1.0.7
 *   **Developer:** Khaled Abdelhamid
 *   **Contact:** khaled1512@gmail.com
 *   **License:** GPL-3.0

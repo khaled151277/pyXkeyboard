@@ -110,18 +110,22 @@
 </head>
 <body>
 
-    <h1>Python XKeyboard - User Guide (v1.0.5)</h1>
+    <h1>Python XKeyboard - User Guide (v1.0.7)</h1>
 
     <p>Welcome to Python XKeyboard! This is a simple, customizable on-screen virtual keyboard for Linux systems (primarily X11/Xorg). It helps you type, switch between keyboard layouts (e.g., English, Arabic) easily, and simulate key presses, with several customization options.</p>
 
     <h2>Key Features</h2>
     <ul>
         <li><strong>On-Screen Typing:</strong> Click keys to simulate input into other applications (using XTEST).</li>
-        <li><strong>System Layout Switching:</strong> Easily switch between configured system keyboard layouts using the <code>Lang</code> button or the system tray menu (uses <code>xkb-switch</code> if available, otherwise `setxkbmap`).</li>
-        <li><strong>Visual Layout Display:</strong> Keyboard display automatically reflects the currently active system layout (loads characters from corresponding layout files like `layouts/us.json`, `layouts/ar.json`).</li>
-        <li><strong>Modifier Keys:</strong> Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next non-modifier key press.</li>
+        <li><strong>System Layout Switching:</strong> Easily switch between configured system keyboard layouts using the <code>Lang</code> buttons or the system tray menu (uses <code>xkb-switch</code> if available, otherwise `setxkbmap`). The three <code>Lang</code> buttons display the current, next, and next+1 layouts in the cycle.</li>
+        <li><strong>Visual Layout Display:</strong> Keyboard display automatically reflects the currently active system layout. Character mappings are loaded from corresponding JSON files (e.g., `layouts/us.json`, `layouts/ar.json`).
+            <ul>
+                <li>See <a href="CH_MAP_JSON_eng.html">Custom Layout File Format (English)</a> or <a href="CH_MAP_JSON_ara.html">تنسيق ملف التخطيط المخصص (العربية)</a> for details.</li>
+            </ul>
+        </li>
+        <li><strong>Modifier Keys:</strong> Functional `Shift`, `Ctrl`, `Alt`, and `Caps Lock` keys. Shift, Ctrl, and Alt act as "sticky keys" for the next typable key press.</li>
         <li><strong>Right-Click Shift:</strong> Right-click character keys to simulate `Shift + Key`.</li>
-        <li><strong>Movable:</strong> Drag the window background using the **left mouse button** to reposition.</li>
+        <li><strong>Movable & Resizable:</strong> Drag the window background using the **left mouse button** to reposition. If frameless, drag edges to resize.</li>
         <li><strong>Always on Top:</strong> Option to keep the keyboard window visible above other application windows (Default: On).</li>
         <li><strong>System Tray Integration:</strong> Minimize to tray, select layout, show keyboard, and quit from the tray menu (uses a keyboard icon).</li>
         <li><strong>Key Auto-Repeat:</strong> Enable/disable key repeat on long press (includes arrow keys, backspace, delete, space, tab, enter, letters, numbers, symbols) and configure initial delay and repeat interval.</li>
@@ -160,16 +164,16 @@
             <strong>Typing:</strong> Open your target application, then click keys on the virtual keyboard.
         </li>
         <li>
-            <strong>Modifiers:</strong> Click <code>Shift</code>, <code>Ctrl</code>, or <code>Alt</code> once to activate for the next key press. Click <code>Caps Lock</code> to toggle system Caps Lock. Right-click character keys for Shift+Key.
+            <strong>Modifiers:</strong> Click <code>Shift</code>, <code>Ctrl</code>, or <code>Alt</code> once to activate for the next typable key press. Click <code>Caps Lock</code> to toggle system Caps Lock. Right-click character keys for Shift+Key.
         </li>
          <li>
             <strong>Arrow Keys & Repeat:</strong> Click arrow keys or other repeatable keys. Long-press triggers auto-repeat if enabled in Settings.
         </li>
         <li>
-            <strong>Switching Layouts:</strong> Use the <code>Lang</code> button to cycle or right-click the tray icon to select a specific layout. The keyboard display will update based on layout files found in the `layouts` directory (e.g., `ar.json`, `fr.json`).
+            <strong>Switching Layouts:</strong> Use the <code>Lang</code> buttons (which show current, next, next+1 layouts) to cycle or right-click the tray icon to select a specific layout. The keyboard display will update based on layout files.
         </li>
         <li>
-            <strong>Moving:</strong> Left-click and drag the background area.
+            <strong>Moving & Resizing:</strong> Left-click and drag the background area to move. If frameless, drag the window edges to resize.
         </li>
         <li>
             <strong>Minimizing / Hiding:</strong> Use window controls (if framed), the custom `_` button (if frameless), or middle-click the background (if enabled).
@@ -180,10 +184,10 @@
         <li>
             <strong>Settings (<code>Set</code> button):</strong>
             <ul>
-                <li>**General:** Remember Geometry, Always on Top, Sticky (Not Functional), Middle-click Hide, Auto-Show, Frameless Window.</li>
+                <li>**General:** Remember Geometry, Always on Top, Middle-click Hide, Auto-Show, Frameless Window.</li>
                 <li>**Appearance:** Font, Button Text Color, Use System Theme Colors (overrides custom backgrounds/style), Custom Window/Button Background Colors, Background Opacity, Custom Button Style (disabled if using system colors).</li>
                  <li>**Typing:** Auto-Repeat options.</li>
-                 <li>**Help:** View help guides.</li>
+                 <li>**Help:** View help guides (including custom layout format).</li>
             </ul>
         </li>
         <li>
@@ -195,7 +199,7 @@
         <h2>Troubleshooting Notes:</h2>
         <ul>
             <li><strong>Typing doesn't work / wrong characters typed:</strong> Check XTEST status in "About". Ensure `python-xlib` is installed and you are on X11/Xorg. Wrong characters often mean the *system's* active keyboard layout doesn't match the keyboard's visual expectation (e.g., system is AZERTY, keyboard shows QWERTY). Ensure system layout matches visually supported ones (like `us`, `ar`, etc.) or add/edit corresponding JSON files in the `layouts` directory.</li>
-             <li><strong>Correct language characters not displayed on keys:</strong> Make sure a layout file corresponding to your system's layout code (e.g., `ara.json` for `ara`, `fr.json` for `fr`) exists in the `layouts` subdirectory within the application's installation path (`/usr/lib/python*/site-packages/pyxkeyboard/layouts/`). Check startup logs for loading errors.</li>
+             <li><strong>Correct language characters not displayed on keys:</strong> Make sure a layout file corresponding to your system's layout code (e.g., `ara.json` for `ara`, `fr.json` for `fr`) exists in the `layouts` subdirectory within the application's installation path (`/usr/lib/python*/site-packages/pyxkeyboard/layouts/`). Check startup logs for loading errors. Refer to the custom layout format documentation accessible via the Help tab in Settings.</li>
             <li><strong>Language switching doesn't work:</strong> Check XKB status in "About". Ensure `xkb-switch` (preferred) or `setxkbmap` (fallback) is installed. Multiple layouts must be configured in your OS settings.</li>
             <li><strong>Tray icon missing:</strong> System tray support might be missing or need configuration on some desktops.</li>
             <li><strong>Middle-click hide doesn't work:</strong> Ensure option is checked in Settings -> General.</li>
@@ -211,7 +215,7 @@
     <!-- About Section -->
     <div class="about-section">
         <h2>About Python XKeyboard</h2>
-        <p>Version: 1.0.5</p>
+        <p>Version: 1.0.7</p>
         <p>Developed by: Khaled Abdelhamid<br>
         Contact: <a href="mailto:khaled1512@gmail.com">khaled1512@gmail.com</a></p>
         <p><strong>License:</strong> GPLv3</p>

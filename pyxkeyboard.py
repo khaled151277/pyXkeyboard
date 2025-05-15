@@ -2,92 +2,103 @@
 # -*- coding: utf-8 -*-
 
 # file: pyxkeyboard.py (to be installed as /usr/bin/pyxkeyboard)
-# PyXKeyboard v1.0.5 - Launcher Script
+# PyXKeyboard v1.0.7 - Launcher Script
 # This script ensures the package is in the Python path and runs the main function.
 # Developed by Khaled Abdelhamid (khaled1512@gmail.com) - Licensed under GPLv3.
 
 import sys
 import os
 import site
-import locale
+# import locale # Localization not yet implemented
 
-# --- إعداد المجال للترجمة (إذا كنت ستستخدمها لاحقًا) ---
+# --- Localization Setup (Placeholder) ---
 # locale.bindtextdomain('pyxkeyboard', '/usr/share/locale') # Example path
 # locale.textdomain('pyxkeyboard')
 # _ = locale.gettext
 
-# --- إضافة مسارات التثبيت القياسية إلى مسار بايثون ---
-# هذا مهم لضمان العثور على الوحدة pyxkeyboard بعد التثبيت.
+# --- Add Standard Installation Paths to Python Path ---
+# This is important to ensure the pyxkeyboard module is found after installation.
 
-# دالة لإضافة مسار إذا كان موجودًا ولم يكن مضافًا بالفعل
-def add_to_sys_path(path_to_add):
+def add_to_sys_path_if_exists(path_to_add):
+    """Adds a directory to sys.path if it exists and isn't already there."""
     if os.path.isdir(path_to_add) and path_to_add not in sys.path:
-        # site.addsitedir(path_to_add) # طريقة أخرى قد تكون أفضل أحيانًا
-        sys.path.insert(0, path_to_add)
-        # print(f"Debug: Added to sys.path: {path_to_add}") # للتشخيص فقط
+        # site.addsitedir(path_to_add) # Another way, sometimes preferable
+        sys.path.insert(0, path_to_add) # Prepend to prioritize over dev versions
+        # print(f"Debug: Added to sys.path: {path_to_add}") # For diagnostics only
 
-# مسارات شائعة لحزم النظام (قد تحتاج لتعديل حسب التوزيعة)
-common_paths = [
-    "/usr/lib/python3/dist-packages",
-    "/usr/lib64/python3/site-packages", # شائع في أنظمة RPM 64-bit
-    "/usr/lib/python3/site-packages",
+# Common system-wide package locations (adjust based on distribution if needed)
+common_system_paths = [
+    "/usr/lib/python3/dist-packages",    # Debian/Ubuntu
+    "/usr/lib64/python3/site-packages",  # Fedora/RHEL 64-bit
+    "/usr/lib/python3/site-packages",    # Other Linux, or 32-bit Fedora/RHEL
 ]
 
-# إضافة المسارات الشائعة
-for path in common_paths:
-    add_to_sys_path(path)
+for path in common_system_paths:
+    add_to_sys_path_if_exists(path)
 
-# محاولة إضافة مسار site-packages الخاص بإصدار بايثون الحالي
+# Attempt to add the site-packages path for the current Python version specifically
 try:
-    # الحصول على مسار site-packages القياسي لهذا الإصدار
-    # قد يختلف هذا قليلاً بين التوزيعات
     py_version_major_minor = f"{sys.version_info.major}.{sys.version_info.minor}"
-    site_packages_path = f"/usr/lib/python{py_version_major_minor}/site-packages"
-    add_to_sys_path(site_packages_path)
-    # قد تحتاج أيضًا للتحقق من /usr/local/lib/...
-    local_site_packages_path = f"/usr/local/lib/python{py_version_major_minor}/dist-packages" # لـ Debian/Ubuntu
-    add_to_sys_path(local_site_packages_path)
-    local_site_packages_path_rpm = f"/usr/local/lib/python{py_version_major_minor}/site-packages" # لـ RPM
-    add_to_sys_path(local_site_packages_path_rpm)
+    
+    # Standard system site-packages for this version
+    # sys_site_packages_path = f"/usr/lib/python{py_version_major_minor}/site-packages"
+    # add_to_sys_path_if_exists(sys_site_packages_path)
+    
+    # User-local site-packages (less common for system-wide launchers, but for completeness)
+    # local_user_site_packages = site.getusersitepackages()
+    # add_to_sys_path_if_exists(local_user_site_packages)
+
+    # Debian/Ubuntu specific local path
+    local_dist_packages_path = f"/usr/local/lib/python{py_version_major_minor}/dist-packages"
+    add_to_sys_path_if_exists(local_dist_packages_path)
+    
+    # RPM-based specific local path
+    local_site_packages_path_rpm = f"/usr/local/lib/python{py_version_major_minor}/site-packages"
+    add_to_sys_path_if_exists(local_site_packages_path_rpm)
 
 except Exception as e:
-    print(f"Warning: Could not dynamically add specific site-packages path: {e}", file=sys.stderr)
+    print(f"Warning: Could not dynamically add specific Python version site-packages path: {e}", file=sys.stderr)
 
 
-# --- محاولة تشغيل من شجرة المصدر (للتطوير/الاختبار) ---
-# هذا الجزء مشابه للملف المرفق ويتيح تشغيل السكربت مباشرة من مجلد المشروع
+# --- Attempt to run from source tree (for development/testing) ---
+# This part might be less relevant for an installed launcher, but harmless.
+# It assumes the launcher might be in a bin dir relative to the package.
+# For a system-installed launcher, the package should already be in a known site-packages.
 try:
-    PROJECT_ROOT_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
-    # نفترض أن هذا الملف سيكون في /usr/bin، لذا نحتاج للبحث عن الوحدة
-    # في مسارات site-packages التي أضفناها أعلاه.
-
-    # إذا فشل الاستيراد أدناه، قد يعني أن الحزمة غير مثبتة بشكل صحيح
-    # أو أننا بحاجة لتعديل المسارات أعلاه لتطابق نظام التثبيت.
-
+    # If this script is /usr/bin/pyxkeyboard, this won't find the source typically.
+    # The sys.path additions above are more critical for installed versions.
+    # PROJECT_ROOT_DIRECTORY = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    # if PROJECT_ROOT_DIRECTORY not in sys.path:
+    #     sys.path.insert(0, PROJECT_ROOT_DIRECTORY)
+    #     print(f"Debug: Added project root to sys.path: {PROJECT_ROOT_DIRECTORY}") # Dev only
+    pass
 except Exception as e:
-     print(f"Error determining project root: {e}", file=sys.stderr)
-     # لا يمكن المتابعة بدون مسار صحيح أو وحدة مثبتة
-     # sys.exit(1) # يمكنك الخروج هنا إذا أردت
+     print(f"Debug: Error determining project root for dev: {e}", file=sys.stderr)
 
-# --- استيراد وتشغيل الوحدة الرئيسية ---
+
+# --- Import and Run the Main Application Module ---
 try:
-    # الآن يجب أن يكون pyxkeyboard متاحًا في sys.path
-    from pyxkeyboard import main as pyx_main # استيراد الدالة main من الوحدة
-    # print("Debug: Successfully imported pyxkeyboard.main") # للتشخيص
-    # تشغيل الدالة الرئيسية للتطبيق
-    pyx_main.main()
+    # The 'pyxkeyboard' package should now be findable via the modified sys.path
+    from pyxkeyboard import main as pyx_main_module # Import the main.py module
+    # print("Debug: Successfully imported pyxkeyboard.main module") # Diagnostics
+    
+    # Call the main function within that module
+    pyx_main_module.main()
+
 except ImportError:
     print("FATAL ERROR: Could not import the 'pyxkeyboard' module.", file=sys.stderr)
-    print("Ensure the package is installed correctly in one of the Python paths:", file=sys.stderr)
+    print("This usually means the PyXKeyboard package is not installed correctly or not in Python's search path.", file=sys.stderr)
+    print("Current Python search paths (sys.path):", file=sys.stderr)
     print("\n".join(sys.path), file=sys.stderr)
     sys.exit(1)
 except AttributeError:
-     print("FATAL ERROR: Could not find the 'main' function within the 'pyxkeyboard.main' module.", file=sys.stderr)
-     sys.exit(1)
+    # This would happen if 'main' function is missing in pyxkeyboard.main
+    print("FATAL ERROR: Could not find the 'main' function within the 'pyxkeyboard.main' module.", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
-    print(f"FATAL ERROR: An unexpected error occurred during execution: {e}", file=sys.stderr)
+    print(f"FATAL ERROR: An unexpected error occurred during application startup: {e}", file=sys.stderr)
     import traceback
     traceback.print_exc()
     sys.exit(1)
 
-# file: pyxkeyboard_launcher.py
+# file: pyxkeyboard_launcher.py (Conceptual name for the installed script)
